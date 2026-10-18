@@ -20,7 +20,11 @@
   "entity": {
     "binary_sensor": {
       "fuel_low": {
-        "name": "Fuel low"
+        "name": "Fuel low",
+        "state": {
+          "on": "Low",
+          "off": "Sufficient"
+        }
       }
     },
     "lock": {

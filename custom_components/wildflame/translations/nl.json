@@ -20,7 +20,11 @@
   "entity": {
     "binary_sensor": {
       "fuel_low": {
-        "name": "Brandstof bijna op"
+        "name": "Brandstof bijna op",
+        "state": {
+          "on": "Bijna leeg",
+          "off": "Voldoende"
+        }
       }
     },
     "lock": {

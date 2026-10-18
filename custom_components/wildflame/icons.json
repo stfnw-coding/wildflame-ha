@@ -2,7 +2,10 @@
   "entity": {
     "binary_sensor": {
       "fuel_low": {
-        "default": "mdi:fuel"
+        "default": "mdi:fuel",
+        "state": {
+          "on": "mdi:gauge-empty"
+        }
       }
     },
     "number": {

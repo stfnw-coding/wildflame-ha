@@ -6,7 +6,6 @@ from collections.abc import Callable
 from dataclasses import dataclass
 
 from homeassistant.components.binary_sensor import (
-    BinarySensorDeviceClass,
     BinarySensorEntity,
     BinarySensorEntityDescription,
 )
@@ -27,7 +26,8 @@ class WildflameBinarySensorDescription(BinarySensorEntityDescription):
 BINARY_SENSORS: tuple[WildflameBinarySensorDescription, ...] = (
     WildflameBinarySensorDescription(
         key="fuel_low",
-        device_class=BinarySensorDeviceClass.PROBLEM,
+        # No device class: "problem" would show as OK/Problem. The states get
+        # their own labels ("Low" / "Sufficient") in the translations instead.
         value_fn=lambda s: s.fuel_percent <= FUEL_LOW_PERCENT,
     ),
 )

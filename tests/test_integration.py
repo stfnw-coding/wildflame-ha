@@ -198,6 +198,8 @@ async def test_fuel_low(hass: HomeAssistant, entry, burner) -> None:
     burner.fuel = 1
     await setup(hass, entry)
     assert hass.states.get(FUEL_LOW).state == "on"
+    # Not a "problem" sensor: that would show as OK/Problem instead of Bijna leeg/Voldoende.
+    assert "device_class" not in hass.states.get(FUEL_LOW).attributes
     burner.fuel = 2
     await entry.runtime_data.async_refresh()
     await hass.async_block_till_done()
