@@ -1,0 +1,31 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" width="512" height="512">
+  <defs>
+    <linearGradient id="outer" x1="0" y1="1" x2="0" y2="0">
+      <stop offset="0" stop-color="#e2401b"/>
+      <stop offset="0.55" stop-color="#f66a1d"/>
+      <stop offset="1" stop-color="#ffa41f"/>
+    </linearGradient>
+    <linearGradient id="inner" x1="0" y1="1" x2="0" y2="0">
+      <stop offset="0" stop-color="#ffc93a"/>
+      <stop offset="1" stop-color="#fff0a6"/>
+    </linearGradient>
+  </defs>
+  <!-- outer flame -->
+  <path fill="url(#outer)" d="M262 0
+    C 300 78, 404 140, 404 286
+    C 404 378, 340 436, 256 436
+    C 172 436, 108 378, 108 290
+    C 108 220, 146 170, 182 132
+    C 184 184, 204 214, 232 226
+    C 214 150, 228 66, 262 0 Z"/>
+  <!-- inner flame -->
+  <path fill="url(#inner)" d="M258 196
+    C 284 250, 338 282, 338 346
+    C 338 398, 302 432, 256 432
+    C 210 432, 174 398, 174 350
+    C 174 306, 204 280, 224 252
+    C 230 280, 242 292, 254 296
+    C 246 262, 246 228, 258 196 Z"/>
+  <!-- burner -->
+  <rect x="0" y="456" width="512" height="56" rx="28" fill="#3c4248"/>
+</svg>
