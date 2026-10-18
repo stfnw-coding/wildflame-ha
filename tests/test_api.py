@@ -30,6 +30,9 @@ def test_parse_captured_status() -> None:
         (" usart1=2, usart2=10, usart3=0, usart4=45, usart5=20, usart6=0, usart7=1", BurnerState.WARMING_UP),
         (" usart1=2, usart2=0, usart3=5, usart4=45, usart5=20, usart6=0, usart7=1", BurnerState.BURNING),
         (" usart1=2, usart2=1, usart3=0, usart4=45, usart5=20, usart6=0, usart7=0", BurnerState.COOLING),
+        # Phase codes not seen yet (errors?) must not be mistaken for a normal state.
+        (" usart1=2, usart2=7, usart3=0, usart4=45, usart5=20, usart6=0, usart7=0", BurnerState.UNKNOWN_PHASE),
+        (" usart1=2, usart2=7, usart3=5, usart4=45, usart5=20, usart6=0, usart7=1", BurnerState.UNKNOWN_PHASE),
     ],
 )
 def test_derived_state(body: str, state: BurnerState) -> None:

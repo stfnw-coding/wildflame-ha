@@ -19,6 +19,11 @@
   },
   "entity": {
     "binary_sensor": {
+      "fuel_low": {
+        "name": "Brandstof bijna op"
+      }
+    },
+    "lock": {
       "child_lock": {
         "name": "Kinderslot"
       }
@@ -26,6 +31,9 @@
     "number": {
       "flame_level": {
         "name": "Vlamhoogte"
+      },
+      "auto_off": {
+        "name": "Automatisch uit na"
       }
     },
     "sensor": {
@@ -35,7 +43,8 @@
           "off": "Uit",
           "warming_up": "Opwarmen",
           "burning": "Brandt",
-          "cooling": "Afkoelen"
+          "cooling": "Afkoelen",
+          "unknown_phase": "Onbekende fase"
         },
         "state_attributes": {
           "since": {
@@ -54,7 +63,36 @@
       },
       "phase": {
         "name": "Fasecode"
+      },
+      "on_since": {
+        "name": "Aan sinds"
       }
+    }
+  },
+  "exceptions": {
+    "power_command_pending": {
+      "message": "De haard verwerkt het vorige aan/uit-commando nog. Probeer het zo opnieuw."
+    },
+    "child_lock_command_pending": {
+      "message": "De haard verwerkt het vorige kinderslot-commando nog. Probeer het zo opnieuw."
+    },
+    "child_lock_active": {
+      "message": "Het kinderslot van de haard staat aan."
+    },
+    "cooling_down": {
+      "message": "De haard koelt nog af (rood lampje) en kan pas weer aan als dat klaar is."
+    },
+    "unknown_phase": {
+      "message": "De haard meldt een onbekende fase (code {phase}). Aanzetten is voor de veiligheid geblokkeerd; controleer de haard."
+    },
+    "not_burning": {
+      "message": "De vlamhoogte kan alleen worden aangepast als de haard brandt."
+    },
+    "cannot_connect": {
+      "message": "Haard niet bereikbaar: {error}"
+    },
+    "command_failed": {
+      "message": "Commando naar de haard mislukt: {error}"
     }
   }
 }

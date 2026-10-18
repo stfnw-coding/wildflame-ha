@@ -15,12 +15,15 @@ Home Assistant. No cloud: Home Assistant talks directly to the burner over the b
 | Entity | What it does |
 |---|---|
 | `switch.<name>` | Turn the burner on or off |
-| `number.<name>_flame_level` | Flame level 1–10 (only while burning) |
-| `sensor.<name>_status` | Off / Warming up / Burning / Cooling down, with a `since` attribute |
+| `number.<name>_flame_level` | Flame level 1–10 (unavailable unless the burner is burning) |
+| `sensor.<name>_status` | Off / Warming up / Burning / Cooling down / Unknown phase, with a `since` attribute |
+| `sensor.<name>_on_since` | When the burner was switched on (empty while off) |
 | `sensor.<name>_fuel_level` | Fuel level in % (steps of 10%) |
+| `binary_sensor.<name>_fuel_low` | On at 10% fuel or less |
 | `sensor.<name>_room_temperature` | Room temperature in °C |
 | `sensor.<name>_humidity` | Humidity in % |
-| `binary_sensor.<name>_child_lock` | Child lock on the burner (read only) |
+| `lock.<name>_child_lock` | Child lock on the burner: lock or unlock it |
+| `number.<name>_auto_off_after` | Switch the burner off after this many hours (0 = never; configuration) |
 | `sensor.<name>_phase_code` | Raw phase code (diagnostic) |
 
 Entity names follow your Home Assistant language (English and Dutch included).
@@ -29,8 +32,12 @@ Entity names follow your Home Assistant language (English and Dutch included).
 The burner only understands *toggle* and *step* commands: the same command switches it on **and** off.
 The integration therefore always reads the current status first and only sends a command when needed:
 - switching on is refused while the burner is cooling down or the child lock is active;
-- after an on/off command no second one is sent for 30 seconds, until the burner reports the new state
-  (a second toggle would undo the first);
+- switching on is also refused when the burner reports a phase code the integration does not know
+  (possibly an error); the code is logged so it can be added;
+- after an on/off or child lock command no second one is sent for 30 seconds, until the burner reports the
+  new state (a second toggle would undo the first);
+- the optional auto-off time switches the burner off after it has been on that long, also when no
+  automation is set up;
 - the flame level changes in single steps one second apart, and only while the burner is burning.
 
 ## Requirements

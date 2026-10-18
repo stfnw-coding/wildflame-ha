@@ -69,9 +69,15 @@ async def async_setup_entry(
     entry: WildflameConfigEntry,
     async_add_entities: AddConfigEntryEntitiesCallback,
 ) -> None:
+    coordinator = entry.runtime_data
     async_add_entities(
-        (WildflameStatusSensor if desc.key == "status" else WildflameSensor)(entry.runtime_data, desc)
-        for desc in SENSORS
+        [
+            *(
+                (WildflameStatusSensor if desc.key == "status" else WildflameSensor)(coordinator, desc)
+                for desc in SENSORS
+            ),
+            WildflameOnSinceSensor(coordinator, "on_since"),
+        ]
     )
 
 
@@ -109,3 +115,13 @@ class WildflameStatusSensor(WildflameSensor):
     @property
     def extra_state_attributes(self) -> dict[str, Any]:
         return {"since": self._since.isoformat() if self._since else None}
+
+
+class WildflameOnSinceSensor(WildflameEntity, SensorEntity):
+    """When the burner was switched on; empty while it is off. Survives a restart."""
+
+    _attr_device_class = SensorDeviceClass.TIMESTAMP
+
+    @property
+    def native_value(self) -> datetime | None:
+        return self.coordinator.powered_since

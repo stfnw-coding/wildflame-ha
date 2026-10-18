@@ -14,6 +14,7 @@ from homeassistant.core import HomeAssistant
 from homeassistant.helpers.entity_platform import AddConfigEntryEntitiesCallback
 
 from .api import WildflameStatus
+from .const import FUEL_LOW_PERCENT
 from .coordinator import WildflameConfigEntry, WildflameCoordinator
 from .entity import WildflameEntity
 
@@ -25,10 +26,9 @@ class WildflameBinarySensorDescription(BinarySensorEntityDescription):
 
 BINARY_SENSORS: tuple[WildflameBinarySensorDescription, ...] = (
     WildflameBinarySensorDescription(
-        key="child_lock",
-        device_class=BinarySensorDeviceClass.LOCK,
-        # LOCK: on means unlocked, so invert the burner's "lock active" flag.
-        value_fn=lambda s: not s.child_lock,
+        key="fuel_low",
+        device_class=BinarySensorDeviceClass.PROBLEM,
+        value_fn=lambda s: s.fuel_percent <= FUEL_LOW_PERCENT,
     ),
 )
 

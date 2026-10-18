@@ -1,0 +1,45 @@
+{
+  "entity": {
+    "binary_sensor": {
+      "fuel_low": {
+        "default": "mdi:fuel"
+      }
+    },
+    "number": {
+      "auto_off": {
+        "default": "mdi:timer-off-outline"
+      },
+      "flame_level": {
+        "default": "mdi:fire"
+      }
+    },
+    "sensor": {
+      "fuel_level": {
+        "default": "mdi:fuel"
+      },
+      "on_since": {
+        "default": "mdi:clock-start"
+      },
+      "phase": {
+        "default": "mdi:numeric"
+      },
+      "status": {
+        "default": "mdi:fireplace-off",
+        "state": {
+          "burning": "mdi:fireplace",
+          "cooling": "mdi:snowflake-thermometer",
+          "unknown_phase": "mdi:alert-circle-outline",
+          "warming_up": "mdi:fire-circle"
+        }
+      }
+    },
+    "switch": {
+      "power": {
+        "default": "mdi:fireplace-off",
+        "state": {
+          "on": "mdi:fireplace"
+        }
+      }
+    }
+  }
+}

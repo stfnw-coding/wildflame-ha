@@ -19,12 +19,12 @@ class FakeBurner:
         self.child_lock = 0
         self.powered = 0
         self.commands: list[str] = []
+        self._server: asyncio.Server | None = None
+        self.port = 0
 
     def ignite(self) -> None:
         """Igniter done: burner starts at flame level 5, as observed."""
         self.phase, self.flame = 0, 5
-        self._server: asyncio.Server | None = None
-        self.port = 0
 
     def body(self) -> str:
         return (

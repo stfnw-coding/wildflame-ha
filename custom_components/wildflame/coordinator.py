@@ -3,15 +3,20 @@
 from __future__ import annotations
 
 import asyncio
+from datetime import datetime, timedelta
 import logging
 import time
+from typing import Any
 
 from homeassistant.config_entries import ConfigEntry
 from homeassistant.core import HomeAssistant
 from homeassistant.exceptions import HomeAssistantError
+from homeassistant.helpers.storage import Store
 from homeassistant.helpers.update_coordinator import DataUpdateCoordinator, UpdateFailed
+from homeassistant.util import dt as dt_util
 
 from .api import (
+    CODE_CHILD_LOCK_TOGGLE,
     CODE_FLAME_DOWN,
     CODE_FLAME_UP,
     CODE_POWER_TOGGLE,
@@ -22,11 +27,55 @@ from .api import (
     WildflameError,
     WildflameStatus,
 )
-from .const import DOMAIN, FLAME_STEP_DELAY_SECONDS, POWER_TOGGLE_GUARD_SECONDS, SCAN_INTERVAL
+from .const import (
+    AUTO_OFF_RETRY_SECONDS,
+    DOMAIN,
+    FLAME_STEP_DELAY_SECONDS,
+    POWER_TOGGLE_GUARD_SECONDS,
+    POWERED_SINCE_MAX_GAP,
+    SCAN_INTERVAL,
+    STORAGE_SAVE_INTERVAL_SECONDS,
+    STORAGE_VERSION,
+)
 
 _LOGGER = logging.getLogger(__name__)
 
 type WildflameConfigEntry = ConfigEntry[WildflameCoordinator]
+
+
+def _error(key: str, **placeholders: str) -> HomeAssistantError:
+    """An error shown to the user in their own language (see "exceptions" in strings.json)."""
+    return HomeAssistantError(
+        translation_domain=DOMAIN,
+        translation_key=key,
+        translation_placeholders=placeholders or None,
+    )
+
+
+class _ToggleGuard:
+    """Refuses a second toggle until the burner reports the change, or the guard times out.
+
+    A second toggle sent before the first one shows up would undo it.
+    """
+
+    def __init__(self) -> None:
+        self._since: float | None = None
+        self._from: bool | None = None
+
+    def start(self, current: bool) -> None:
+        self._since, self._from = time.monotonic(), current
+
+    def observe(self, current: bool) -> None:
+        if self._from is not None and current != self._from:
+            self._since = self._from = None
+
+    def active(self) -> bool:
+        if self._since is None:
+            return False
+        if time.monotonic() - self._since > POWER_TOGGLE_GUARD_SECONDS:
+            self._since = self._from = None
+            return False
+        return True
 
 
 class WildflameCoordinator(DataUpdateCoordinator[WildflameStatus]):
@@ -46,49 +95,124 @@ class WildflameCoordinator(DataUpdateCoordinator[WildflameStatus]):
         )
         self.client = client
         self._command_lock = asyncio.Lock()
-        self._power_pending_since: float | None = None
-        self._power_pending_from: bool | None = None
+        self._power_guard = _ToggleGuard()
+        self._child_lock_guard = _ToggleGuard()
+        self._store: Store[dict[str, Any]] = Store(
+            hass, STORAGE_VERSION, f"{DOMAIN}.{entry.entry_id}"
+        )
+        self.powered_since: datetime | None = None
+        self.auto_off_hours: float = 0
+        self._auto_off_attempt: float | None = None
+        self._last_save = 0.0
+        self._warned_phases: set[int] = set()
+
+    async def _async_setup(self) -> None:
+        stored = await self._store.async_load() or {}
+        self.auto_off_hours = float(stored.get("auto_off_hours", 0))
+        # Only trust the stored start time if Home Assistant saw the burner burning just before
+        # it went down; otherwise it may have been switched off and on again in between.
+        last_seen = dt_util.parse_datetime(stored.get("last_seen") or "")
+        if last_seen and dt_util.utcnow() - last_seen < POWERED_SINCE_MAX_GAP:
+            self.powered_since = dt_util.parse_datetime(stored.get("powered_since") or "")
 
     async def _async_update_data(self) -> WildflameStatus:
         try:
             status = await self.client.get_status()
         except WildflameError as err:
             raise UpdateFailed(str(err)) from err
-        if self._power_pending_from is not None and status.powered != self._power_pending_from:
-            self._clear_power_guard()
+        self._power_guard.observe(status.powered)
+        self._child_lock_guard.observe(status.child_lock)
+        self._track_powered(status)
+        self._check_auto_off(status)
+        if status.state is BurnerState.UNKNOWN_PHASE and status.phase not in self._warned_phases:
+            self._warned_phases.add(status.phase)
+            _LOGGER.warning(
+                "The burner reports phase code %s, which this integration does not know yet. "
+                "Please report it with what the burner was doing: %s",
+                status.phase,
+                "https://github.com/stfnw-coding/wildflame-ha/issues",
+            )
         return status
 
-    def _clear_power_guard(self) -> None:
-        self._power_pending_since = None
-        self._power_pending_from = None
+    def _track_powered(self, status: WildflameStatus) -> None:
+        if status.powered:
+            if self.powered_since is None:
+                self.powered_since = dt_util.utcnow()
+                self._save()
+            elif time.monotonic() - self._last_save > STORAGE_SAVE_INTERVAL_SECONDS:
+                self._save()  # refreshes last_seen
+        elif self.powered_since is not None:
+            self.powered_since = None
+            self._auto_off_attempt = None
+            self._save()
 
-    def _power_guard_active(self) -> bool:
-        if self._power_pending_since is None:
-            return False
-        if time.monotonic() - self._power_pending_since > POWER_TOGGLE_GUARD_SECONDS:
-            self._clear_power_guard()
-            return False
-        return True
+    def _save(self) -> None:
+        self._last_save = time.monotonic()
+        self._store.async_delay_save(self._storage_data, 0)
+
+    def _storage_data(self) -> dict[str, Any]:
+        return {
+            "auto_off_hours": self.auto_off_hours,
+            "powered_since": self.powered_since.isoformat() if self.powered_since else None,
+            "last_seen": dt_util.utcnow().isoformat() if self.powered_since else None,
+        }
+
+    async def async_set_auto_off_hours(self, hours: float) -> None:
+        self.auto_off_hours = hours
+        self._save()
+        if self.data is not None:
+            self._check_auto_off(self.data)
+        self.async_update_listeners()
+
+    def _check_auto_off(self, status: WildflameStatus) -> None:
+        if not (status.powered and self.auto_off_hours and self.powered_since):
+            return
+        if dt_util.utcnow() - self.powered_since < timedelta(hours=self.auto_off_hours):
+            return
+        if (
+            self._auto_off_attempt is not None
+            and time.monotonic() - self._auto_off_attempt < AUTO_OFF_RETRY_SECONDS
+        ):
+            return
+        self._auto_off_attempt = time.monotonic()
+        self.config_entry.async_create_task(
+            self.hass, self._async_auto_off(), f"{DOMAIN} auto off"
+        )
+
+    async def _async_auto_off(self) -> None:
+        _LOGGER.info("Switching the burner off: the %s h auto-off time has passed", self.auto_off_hours)
+        try:
+            await self.async_set_power(False)
+        except HomeAssistantError as err:
+            _LOGGER.warning("Automatic switch-off failed, will retry: %s", err)
 
     async def async_set_power(self, on: bool) -> None:
         async with self._command_lock:
             status = await self._fresh_status()
             if status.powered == on:
                 return
-            if self._power_guard_active():
-                raise HomeAssistantError(
-                    "De haard verwerkt het vorige aan/uit-commando nog; probeer het zo opnieuw."
-                )
+            if self._power_guard.active():
+                raise _error("power_command_pending")
             if on:
                 if status.child_lock:
-                    raise HomeAssistantError("Het kinderslot van de haard staat aan.")
+                    raise _error("child_lock_active")
                 if status.state is BurnerState.COOLING:
-                    raise HomeAssistantError(
-                        "De haard koelt nog af (rood lampje) en kan pas weer aan als dat klaar is."
-                    )
+                    raise _error("cooling_down")
+                if status.state is BurnerState.UNKNOWN_PHASE:
+                    raise _error("unknown_phase", phase=str(status.phase))
             await self._send(CODE_POWER_TOGGLE)
-            self._power_pending_since = time.monotonic()
-            self._power_pending_from = status.powered
+            self._power_guard.start(status.powered)
+        await self.async_request_refresh()
+
+    async def async_set_child_lock(self, locked: bool) -> None:
+        async with self._command_lock:
+            status = await self._fresh_status()
+            if status.child_lock == locked:
+                return
+            if self._child_lock_guard.active():
+                raise _error("child_lock_command_pending")
+            await self._send(CODE_CHILD_LOCK_TOGGLE)
+            self._child_lock_guard.start(status.child_lock)
         await self.async_request_refresh()
 
     async def async_set_flame_level(self, level: int) -> None:
@@ -96,11 +220,9 @@ class WildflameCoordinator(DataUpdateCoordinator[WildflameStatus]):
         async with self._command_lock:
             status = await self._fresh_status()
             if status.state is not BurnerState.BURNING:
-                raise HomeAssistantError(
-                    "De vlamhoogte kan alleen worden aangepast als de haard brandt."
-                )
+                raise _error("not_burning")
             if status.child_lock:
-                raise HomeAssistantError("Het kinderslot van de haard staat aan.")
+                raise _error("child_lock_active")
             steps = level - status.flame_level
             code = CODE_FLAME_UP if steps > 0 else CODE_FLAME_DOWN
             for i in range(abs(steps)):
@@ -113,7 +235,7 @@ class WildflameCoordinator(DataUpdateCoordinator[WildflameStatus]):
         try:
             status = await self.client.get_status()
         except WildflameError as err:
-            raise HomeAssistantError(f"Haard niet bereikbaar: {err}") from err
+            raise _error("cannot_connect", error=str(err)) from err
         self.async_set_updated_data(status)
         return status
 
@@ -121,4 +243,4 @@ class WildflameCoordinator(DataUpdateCoordinator[WildflameStatus]):
         try:
             await self.client.send_command(code)
         except WildflameError as err:
-            raise HomeAssistantError(f"Commando naar de haard mislukt: {err}") from err
+            raise _error("command_failed", error=str(err)) from err

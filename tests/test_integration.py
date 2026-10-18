@@ -1,16 +1,29 @@
 """Tests for the Home Assistant entities and command safety."""
 
+from datetime import timedelta
 from unittest.mock import patch
 
 import pytest
 from homeassistant.core import HomeAssistant
 from homeassistant.exceptions import HomeAssistantError
+from homeassistant.helpers import entity_registry as er
+from homeassistant.util import dt as dt_util
 
-from custom_components.wildflame.api import CODE_FLAME_DOWN, CODE_FLAME_UP, CODE_POWER_TOGGLE
+from custom_components.wildflame.api import (
+    CODE_CHILD_LOCK_TOGGLE,
+    CODE_FLAME_DOWN,
+    CODE_FLAME_UP,
+    CODE_POWER_TOGGLE,
+)
+from custom_components.wildflame.const import DOMAIN
 
 SWITCH = "switch.haard"
 FLAME = "number.haard_vlamhoogte"
 STATUS = "sensor.haard_status"
+CHILD_LOCK = "lock.haard_kinderslot"
+ON_SINCE = "sensor.haard_aan_sinds"
+AUTO_OFF = "number.haard_automatisch_uit_na"
+FUEL_LOW = "binary_sensor.haard_brandstof_bijna_op"
 
 
 @pytest.fixture(autouse=True)
@@ -40,8 +53,11 @@ async def test_entities_created(hass: HomeAssistant, entry, burner) -> None:
     assert hass.states.get("sensor.haard_brandstofniveau").state == "20"
     assert hass.states.get("sensor.haard_kamertemperatuur").state == "20.0"
     assert hass.states.get("sensor.haard_luchtvochtigheid").state == "45.0"
-    assert hass.states.get("binary_sensor.haard_kinderslot").state == "on"  # on = unlocked
-    assert hass.states.get(FLAME).state == "unknown"
+    assert hass.states.get(CHILD_LOCK).state == "unlocked"
+    assert hass.states.get(FLAME).state == "unavailable"  # only adjustable while burning
+    assert hass.states.get(ON_SINCE).state == "unknown"
+    assert hass.states.get(AUTO_OFF).state == "0.0"
+    assert hass.states.get(FUEL_LOW).state == "off"
 
 
 async def test_turn_on_and_off(hass: HomeAssistant, entry, burner) -> None:
@@ -70,11 +86,143 @@ async def test_turn_on_and_off(hass: HomeAssistant, entry, burner) -> None:
     assert len(burner.commands) == 2
 
 
+async def test_on_since(hass: HomeAssistant, entry, burner) -> None:
+    await setup(hass, entry)
+    before = dt_util.utcnow()
+    await call(hass, "switch", "turn_on", SWITCH)
+    on_since = dt_util.parse_datetime(hass.states.get(ON_SINCE).state)
+    assert on_since >= before.replace(microsecond=0)
+
+    burner.ignite()
+    await entry.runtime_data.async_refresh()
+    await hass.async_block_till_done()
+    assert dt_util.parse_datetime(hass.states.get(ON_SINCE).state) == on_since  # warming up counts
+
+    await call(hass, "switch", "turn_off", SWITCH)
+    assert hass.states.get(ON_SINCE).state == "unknown"
+
+
+async def test_on_since_restored_after_restart(hass: HomeAssistant, entry, burner, hass_storage) -> None:
+    burner.powered, burner.phase, burner.flame = 1, 0, 5
+    on_since = dt_util.utcnow() - timedelta(hours=2)
+    hass_storage[f"{DOMAIN}.{entry.entry_id}"] = {
+        "version": 1,
+        "key": f"{DOMAIN}.{entry.entry_id}",
+        "data": {
+            "auto_off_hours": 3,
+            "powered_since": on_since.isoformat(),
+            "last_seen": (dt_util.utcnow() - timedelta(minutes=1)).isoformat(),
+        },
+    }
+    await setup(hass, entry)
+    assert dt_util.parse_datetime(hass.states.get(ON_SINCE).state) == on_since.replace(microsecond=0)
+    assert hass.states.get(AUTO_OFF).state == "3.0"
+
+
+async def test_on_since_not_restored_after_long_gap(hass: HomeAssistant, entry, burner, hass_storage) -> None:
+    burner.powered, burner.phase, burner.flame = 1, 0, 5
+    old = dt_util.utcnow() - timedelta(days=2)
+    hass_storage[f"{DOMAIN}.{entry.entry_id}"] = {
+        "version": 1,
+        "key": f"{DOMAIN}.{entry.entry_id}",
+        "data": {"auto_off_hours": 0, "powered_since": old.isoformat(), "last_seen": old.isoformat()},
+    }
+    await setup(hass, entry)
+    assert dt_util.parse_datetime(hass.states.get(ON_SINCE).state) > old + timedelta(days=1)
+
+
+async def test_auto_off(hass: HomeAssistant, entry, burner) -> None:
+    burner.powered, burner.phase, burner.flame = 1, 0, 5
+    await setup(hass, entry)
+    await call(hass, "number", "set_value", AUTO_OFF, value=2)
+    assert burner.commands == []  # just switched on
+
+    coordinator = entry.runtime_data
+    coordinator.powered_since = dt_util.utcnow() - timedelta(hours=2, minutes=1)
+    await coordinator.async_refresh()
+    await hass.async_block_till_done()
+    assert burner.commands == [CODE_POWER_TOGGLE]
+    assert hass.states.get(SWITCH).state == "off"
+
+    # Off and cooling: nothing more is sent.
+    await coordinator.async_refresh()
+    await hass.async_block_till_done()
+    assert burner.commands == [CODE_POWER_TOGGLE]
+
+
+async def test_auto_off_disabled(hass: HomeAssistant, entry, burner) -> None:
+    burner.powered, burner.phase, burner.flame = 1, 0, 5
+    await setup(hass, entry)
+    coordinator = entry.runtime_data
+    coordinator.powered_since = dt_util.utcnow() - timedelta(hours=20)
+    await coordinator.async_refresh()
+    await hass.async_block_till_done()
+    assert burner.commands == []
+
+
+async def test_child_lock(hass: HomeAssistant, entry, burner) -> None:
+    await setup(hass, entry)
+    await call(hass, "lock", "lock", CHILD_LOCK)
+    assert burner.commands == [CODE_CHILD_LOCK_TOGGLE]
+    assert hass.states.get(CHILD_LOCK).state == "locked"
+
+    # Already locked: no toggle (that would unlock it).
+    await call(hass, "lock", "lock", CHILD_LOCK)
+    assert burner.commands == [CODE_CHILD_LOCK_TOGGLE]
+
+    await call(hass, "lock", "unlock", CHILD_LOCK)
+    assert burner.commands == [CODE_CHILD_LOCK_TOGGLE] * 2
+    assert hass.states.get(CHILD_LOCK).state == "unlocked"
+
+
+async def test_child_lock_guard_blocks_double_toggle(hass: HomeAssistant, entry, burner) -> None:
+    await setup(hass, entry)
+    with patch.object(burner, "apply", side_effect=lambda code: burner.commands.append(code)):
+        await call(hass, "lock", "lock", CHILD_LOCK)
+        with pytest.raises(HomeAssistantError):
+            await call(hass, "lock", "lock", CHILD_LOCK)
+    assert burner.commands == [CODE_CHILD_LOCK_TOGGLE]
+
+
+async def test_read_only_child_lock_removed(hass: HomeAssistant, entry, burner) -> None:
+    entry.add_to_hass(hass)
+    registry = er.async_get(hass)
+    old = registry.async_get_or_create(
+        "binary_sensor", DOMAIN, f"{entry.entry_id}_child_lock", config_entry=entry
+    )
+    await setup(hass, entry)
+    assert registry.async_get(old.entity_id) is None
+
+
+async def test_fuel_low(hass: HomeAssistant, entry, burner) -> None:
+    burner.fuel = 1
+    await setup(hass, entry)
+    assert hass.states.get(FUEL_LOW).state == "on"
+    burner.fuel = 2
+    await entry.runtime_data.async_refresh()
+    await hass.async_block_till_done()
+    assert hass.states.get(FUEL_LOW).state == "off"
+
+
+async def test_unknown_phase_blocks_start(hass: HomeAssistant, entry, burner, caplog) -> None:
+    burner.phase = 7
+    await setup(hass, entry)
+    assert hass.states.get(STATUS).state == "unknown_phase"
+    assert "phase code 7" in caplog.text
+    with pytest.raises(HomeAssistantError) as err:
+        await call(hass, "switch", "turn_on", SWITCH)
+    assert err.value.translation_key == "unknown_phase"
+    assert burner.commands == []
+
+
 async def test_refuse_start_while_cooling(hass: HomeAssistant, entry, burner) -> None:
     burner.phase = 1  # red LED: the burner cannot be started until cooling is done
     await setup(hass, entry)
-    with pytest.raises(HomeAssistantError):
+    with pytest.raises(HomeAssistantError) as err:
         await call(hass, "switch", "turn_on", SWITCH)
+    assert err.value.translation_key == "cooling_down"
+    # Logs get the English text; the frontend shows the message in the user's language.
+    assert "still cooling down" in str(err.value)
     assert burner.commands == []
 
 
@@ -120,8 +268,10 @@ async def test_flame_level_steps(hass: HomeAssistant, entry, burner) -> None:
 async def test_flame_refused_when_not_burning(hass: HomeAssistant, entry, burner) -> None:
     burner.powered, burner.phase, burner.flame = 1, 10, 0  # igniter heating up
     await setup(hass, entry)
-    with pytest.raises(HomeAssistantError):
-        await call(hass, "number", "set_value", FLAME, value=5)
+    assert hass.states.get(FLAME).state == "unavailable"
+    with pytest.raises(HomeAssistantError) as err:
+        await entry.runtime_data.async_set_flame_level(5)
+    assert err.value.translation_key == "not_burning"
     assert burner.commands == []
 
 

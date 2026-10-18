@@ -50,6 +50,8 @@ class BurnerState(StrEnum):
     WARMING_UP = "warming_up"  # switched on, igniter and burner heating up; flame not adjustable yet (~7 min)
     BURNING = "burning"
     COOLING = "cooling"  # switched off, cooling down (can take over an hour)
+    # Phase code not seen before, possibly an error or a blocked burner. Not "unknown": HA reserves that.
+    UNKNOWN_PHASE = "unknown_phase"
 
 
 # usart2 is the burner's phase code; it matches the status LED. Observed 2026-10-18.
@@ -57,6 +59,7 @@ PHASE_BURNING = 0
 PHASE_COOLING = 1  # red LED blinking
 PHASE_READY = 6  # LED off
 PHASE_WARMING_UP = 10  # green LED blinking
+KNOWN_PHASES = frozenset({PHASE_BURNING, PHASE_COOLING, PHASE_READY, PHASE_WARMING_UP})
 
 
 @dataclass(frozen=True, slots=True)
@@ -79,6 +82,8 @@ class WildflameStatus:
 
     @property
     def state(self) -> BurnerState:
+        if self.phase not in KNOWN_PHASES:
+            return BurnerState.UNKNOWN_PHASE
         if self.powered:
             if self.phase == PHASE_WARMING_UP or self.flame_level < FLAME_MIN:
                 return BurnerState.WARMING_UP

@@ -13,19 +13,26 @@ Home Assistant. Geen cloud: Home Assistant praat rechtstreeks met de haard via d
 | Entiteit | Wat |
 |---|---|
 | `switch.<naam>` | Haard aan/uit |
-| `number.<naam>_vlamhoogte` | Vlamhoogte 1–10 (alleen als de haard brandt) |
-| `sensor.<naam>_status` | Uit / Opwarmen / Brandt / Afkoelen, met eigenschap `since` |
+| `number.<naam>_vlamhoogte` | Vlamhoogte 1–10 (niet beschikbaar als de haard niet brandt) |
+| `sensor.<naam>_status` | Uit / Opwarmen / Brandt / Afkoelen / Onbekende fase, met eigenschap `since` |
+| `sensor.<naam>_aan_sinds` | Wanneer de haard is aangezet (leeg als hij uit staat) |
 | `sensor.<naam>_brandstofniveau` | Brandstof in % (stappen van 10%) |
+| `binary_sensor.<naam>_brandstof_bijna_op` | Aan bij 10% brandstof of minder |
 | `sensor.<naam>_kamertemperatuur` | Kamertemperatuur in °C |
 | `sensor.<naam>_luchtvochtigheid` | Luchtvochtigheid in % |
-| `binary_sensor.<naam>_kinderslot` | Kinderslot op de haard (alleen uitlezen) |
+| `lock.<naam>_kinderslot` | Kinderslot op de haard: vergrendelen of ontgrendelen |
+| `number.<naam>_automatisch_uit_na` | Zet de haard uit na zoveel uur (0 = nooit; instelling) |
 | `sensor.<naam>_fasecode` | Ruwe fasecode (diagnostisch) |
 
 ### Veiligheid
 De haard kent alleen *toggle*- en *stap*-commando's: hetzelfde commando zet hem aan én uit. De integratie leest
 daarom altijd eerst de status en stuurt alleen een commando als dat nodig is:
 - aanzetten wordt geweigerd tijdens het afkoelen of als het kinderslot aan staat;
-- na een aan/uit-commando wordt 30 seconden geen tweede gestuurd tot de haard de nieuwe toestand meldt;
+- aanzetten wordt ook geweigerd als de haard een onbekende fasecode meldt (mogelijk een storing); de code komt
+  in het logboek zodat hij kan worden toegevoegd;
+- na een aan/uit- of kinderslot-commando wordt 30 seconden geen tweede gestuurd tot de haard de nieuwe toestand
+  meldt;
+- de optionele tijd "Automatisch uit na" zet de haard uit als hij zo lang aan staat, ook zonder automatisering;
 - de vlamhoogte gaat in losse stappen van 1 met een seconde ertussen, en alleen als de haard brandt.
 
 ## Wat je nodig hebt
