@@ -265,6 +265,31 @@ async def test_flame_level_steps(hass: HomeAssistant, entry, burner) -> None:
     assert burner.flame == 4
 
 
+async def test_flame_slider_follows_each_step(hass: HomeAssistant, entry, burner) -> None:
+    # One slide from 5 to 1 must show 4, 3, 2 and 1 as the burner reports them, not a jump at the end.
+    burner.powered, burner.phase, burner.flame = 1, 0, 5
+    await setup(hass, entry)
+    seen: list[str] = []
+    unsub = hass.bus.async_listen(
+        "state_changed",
+        lambda event: seen.append(event.data["new_state"].state)
+        if event.data["entity_id"] == FLAME
+        else None,
+    )
+    await call(hass, "number", "set_value", FLAME, value=1)
+    unsub()
+    assert seen == ["4", "3", "2", "1"]
+    assert burner.commands == [CODE_FLAME_DOWN] * 4
+
+
+async def test_flame_stops_when_burner_ignores_steps(hass: HomeAssistant, entry, burner) -> None:
+    burner.powered, burner.phase, burner.flame = 1, 0, 5
+    await setup(hass, entry)
+    with patch.object(burner, "apply", side_effect=lambda code: burner.commands.append(code)):
+        await call(hass, "number", "set_value", FLAME, value=1)
+    assert len(burner.commands) == 6  # 4 steps + 2 retries, then gives up
+
+
 async def test_flame_refused_when_not_burning(hass: HomeAssistant, entry, burner) -> None:
     burner.powered, burner.phase, burner.flame = 1, 10, 0  # igniter heating up
     await setup(hass, entry)

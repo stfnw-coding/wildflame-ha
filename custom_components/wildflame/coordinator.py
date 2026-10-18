@@ -223,13 +223,15 @@ class WildflameCoordinator(DataUpdateCoordinator[WildflameStatus]):
                 raise _error("not_burning")
             if status.child_lock:
                 raise _error("child_lock_active")
-            steps = level - status.flame_level
-            code = CODE_FLAME_UP if steps > 0 else CODE_FLAME_DOWN
-            for i in range(abs(steps)):
-                if i:
-                    await asyncio.sleep(FLAME_STEP_DELAY_SECONDS)
-                await self._send(code)
-        await self.async_request_refresh()
+            # Step one at a time and publish the burner's own reading after every step,
+            # so the slider follows the flame (5 -> 4 -> 3 ...) instead of jumping at the end.
+            # Bounded so a burner that ignores a step cannot keep us looping.
+            for _ in range(abs(level - status.flame_level) + 2):
+                if status.flame_level == level or status.state is not BurnerState.BURNING:
+                    break
+                await self._send(CODE_FLAME_UP if level > status.flame_level else CODE_FLAME_DOWN)
+                await asyncio.sleep(FLAME_STEP_DELAY_SECONDS)
+                status = await self._fresh_status()
 
     async def _fresh_status(self) -> WildflameStatus:
         try:
