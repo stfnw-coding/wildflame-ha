@@ -1,0 +1,60 @@
+{
+  "config": {
+    "step": {
+      "user": {
+        "title": "Wild Flame burner",
+        "description": "The burner is only reachable on its own Wi-Fi (WILDFLAME…). Connect Home Assistant to that network first.",
+        "data": {
+          "name": "Name",
+          "host": "IP address"
+        }
+      }
+    },
+    "error": {
+      "cannot_connect": "Cannot reach the burner. Is Home Assistant connected to the burner's Wi-Fi?"
+    },
+    "abort": {
+      "already_configured": "This burner is already configured."
+    }
+  },
+  "entity": {
+    "binary_sensor": {
+      "child_lock": {
+        "name": "Child lock"
+      }
+    },
+    "number": {
+      "flame_level": {
+        "name": "Flame level"
+      }
+    },
+    "sensor": {
+      "status": {
+        "name": "Status",
+        "state": {
+          "off": "Off",
+          "warming_up": "Warming up",
+          "burning": "Burning",
+          "cooling": "Cooling down"
+        },
+        "state_attributes": {
+          "since": {
+            "name": "Since"
+          }
+        }
+      },
+      "fuel_level": {
+        "name": "Fuel level"
+      },
+      "temperature": {
+        "name": "Room temperature"
+      },
+      "humidity": {
+        "name": "Humidity"
+      },
+      "phase": {
+        "name": "Phase code"
+      }
+    }
+  }
+}

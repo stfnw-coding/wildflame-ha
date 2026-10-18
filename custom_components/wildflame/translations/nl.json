@@ -1,0 +1,60 @@
+{
+  "config": {
+    "step": {
+      "user": {
+        "title": "Wild Flame-haard",
+        "description": "De haard is alleen bereikbaar via zijn eigen wifi (WILDFLAME…). Verbind Home Assistant eerst met dat netwerk.",
+        "data": {
+          "name": "Naam",
+          "host": "IP-adres"
+        }
+      }
+    },
+    "error": {
+      "cannot_connect": "Kan de haard niet bereiken. Is Home Assistant verbonden met de wifi van de haard?"
+    },
+    "abort": {
+      "already_configured": "Deze haard is al toegevoegd."
+    }
+  },
+  "entity": {
+    "binary_sensor": {
+      "child_lock": {
+        "name": "Kinderslot"
+      }
+    },
+    "number": {
+      "flame_level": {
+        "name": "Vlamhoogte"
+      }
+    },
+    "sensor": {
+      "status": {
+        "name": "Status",
+        "state": {
+          "off": "Uit",
+          "warming_up": "Opwarmen",
+          "burning": "Brandt",
+          "cooling": "Afkoelen"
+        },
+        "state_attributes": {
+          "since": {
+            "name": "Sinds"
+          }
+        }
+      },
+      "fuel_level": {
+        "name": "Brandstofniveau"
+      },
+      "temperature": {
+        "name": "Kamertemperatuur"
+      },
+      "humidity": {
+        "name": "Luchtvochtigheid"
+      },
+      "phase": {
+        "name": "Fasecode"
+      }
+    }
+  }
+}
