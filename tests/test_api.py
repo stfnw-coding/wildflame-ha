@@ -1,5 +1,7 @@
 """Tests for the burner client and status parser."""
 
+from unittest.mock import patch
+
 import aiohttp
 import pytest
 
@@ -57,4 +59,12 @@ async def test_client_unreachable(socket_enabled) -> None:
     async with aiohttp.ClientSession() as session:
         client = WildflameClient(session, "127.0.0.1:9", timeout=1)
         with pytest.raises(WildflameConnectionError):
+            await client.get_status()
+
+
+async def test_client_http_error(burner) -> None:
+    async with aiohttp.ClientSession() as session:
+        with patch("custom_components.wildflame.api.STATUS_PATH", "/missing"):
+            client = WildflameClient(session, burner.host)
+        with pytest.raises(WildflameResponseError):
             await client.get_status()

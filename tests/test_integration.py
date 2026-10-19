@@ -5,11 +5,12 @@ from unittest.mock import patch
 
 import pytest
 from homeassistant.core import HomeAssistant
-from homeassistant.exceptions import HomeAssistantError
+from homeassistant.exceptions import HomeAssistantError, ServiceValidationError
 from homeassistant.helpers import entity_registry as er
 from homeassistant.util import dt as dt_util
 
 from custom_components.wildflame.api import (
+    WildflameConnectionError,
     CODE_CHILD_LOCK_TOGGLE,
     CODE_FLAME_DOWN,
     CODE_FLAME_UP,
@@ -231,7 +232,8 @@ async def test_unknown_phase_blocks_start(hass: HomeAssistant, entry, burner, ca
 async def test_refuse_start_while_cooling(hass: HomeAssistant, entry, burner) -> None:
     burner.phase = 1  # red LED: the burner cannot be started until cooling is done
     await setup(hass, entry)
-    with pytest.raises(HomeAssistantError) as err:
+    # A refusal because of the burner's state is not an error: no stack trace in the log.
+    with pytest.raises(ServiceValidationError) as err:
         await call(hass, "switch", "turn_on", SWITCH)
     assert err.value.translation_key == "cooling_down"
     # Logs get the English text; the frontend shows the message in the user's language.
@@ -320,3 +322,77 @@ async def test_unavailable_when_unreachable(hass: HomeAssistant, entry, burner) 
     await coordinator.async_refresh()
     await hass.async_block_till_done()
     assert hass.states.get(SWITCH).state == "unavailable"
+
+
+async def test_power_guard_expires(hass: HomeAssistant, entry, burner) -> None:
+    await setup(hass, entry)
+    with (
+        patch.object(burner, "apply", side_effect=lambda code: burner.commands.append(code)),
+        patch("custom_components.wildflame.coordinator.POWER_TOGGLE_GUARD_SECONDS", -1),
+    ):
+        await call(hass, "switch", "turn_on", SWITCH)
+        await call(hass, "switch", "turn_on", SWITCH)
+    assert burner.commands == [CODE_POWER_TOGGLE] * 2
+
+
+async def test_auto_off_failure_is_retried_later(hass: HomeAssistant, entry, burner, caplog) -> None:
+    burner.powered, burner.phase, burner.flame = 1, 0, 5
+    await setup(hass, entry)
+    await call(hass, "number", "set_value", AUTO_OFF, value=1)
+    coordinator = entry.runtime_data
+    coordinator.powered_since = dt_util.utcnow() - timedelta(hours=2)
+    with patch.object(
+        coordinator.client, "send_command", side_effect=WildflameConnectionError("gone")
+    ) as send:
+        await coordinator.async_refresh()
+        await hass.async_block_till_done()
+        assert "Automatic switch-off failed" in caplog.text
+        # Within the retry interval no new attempt is made.
+        await coordinator.async_refresh()
+        await hass.async_block_till_done()
+    assert send.call_count == 1
+    assert hass.states.get(SWITCH).state == "on"
+
+
+async def test_flame_refused_with_child_lock(hass: HomeAssistant, entry, burner) -> None:
+    burner.powered, burner.phase, burner.flame, burner.child_lock = 1, 0, 5, 1
+    await setup(hass, entry)
+    with pytest.raises(ServiceValidationError) as err:
+        await call(hass, "number", "set_value", FLAME, value=3)
+    assert err.value.translation_key == "child_lock_active"
+    assert burner.commands == []
+
+
+async def test_command_when_unreachable(hass: HomeAssistant, entry, burner) -> None:
+    await setup(hass, entry)
+    await burner.stop()
+    with pytest.raises(HomeAssistantError) as err:
+        await entry.runtime_data.async_set_power(True)
+    assert not isinstance(err.value, ServiceValidationError)
+    assert err.value.translation_key == "cannot_connect"
+
+
+async def test_command_failed(hass: HomeAssistant, entry, burner) -> None:
+    await setup(hass, entry)
+    with (
+        patch.object(
+            entry.runtime_data.client, "send_command", side_effect=WildflameConnectionError("gone")
+        ),
+        pytest.raises(HomeAssistantError) as err,
+    ):
+        await call(hass, "switch", "turn_on", SWITCH)
+    assert err.value.translation_key == "command_failed"
+
+
+async def test_unload_and_remove(hass: HomeAssistant, entry, burner, hass_storage) -> None:
+    await setup(hass, entry)
+    await call(hass, "number", "set_value", AUTO_OFF, value=1)
+    await hass.async_block_till_done()
+    assert f"{DOMAIN}.{entry.entry_id}" in hass_storage
+
+    assert await hass.config_entries.async_unload(entry.entry_id)
+    assert hass.states.get(SWITCH).state == "unavailable"
+
+    await hass.config_entries.async_remove(entry.entry_id)
+    await hass.async_block_till_done()
+    assert f"{DOMAIN}.{entry.entry_id}" not in hass_storage

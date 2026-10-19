@@ -10,7 +10,7 @@ from typing import Any
 
 from homeassistant.config_entries import ConfigEntry
 from homeassistant.core import HomeAssistant
-from homeassistant.exceptions import HomeAssistantError
+from homeassistant.exceptions import HomeAssistantError, ServiceValidationError
 from homeassistant.helpers.storage import Store
 from homeassistant.helpers.update_coordinator import DataUpdateCoordinator, UpdateFailed
 from homeassistant.util import dt as dt_util
@@ -44,8 +44,20 @@ type WildflameConfigEntry = ConfigEntry[WildflameCoordinator]
 
 
 def _error(key: str, **placeholders: str) -> HomeAssistantError:
-    """An error shown to the user in their own language (see "exceptions" in strings.json)."""
+    """The burner could not be reached or did not take the command.
+
+    Shown to the user in their own language (see "exceptions" in strings.json).
+    """
     return HomeAssistantError(
+        translation_domain=DOMAIN,
+        translation_key=key,
+        translation_placeholders=placeholders or None,
+    )
+
+
+def _refused(key: str, **placeholders: str) -> ServiceValidationError:
+    """The burner's current state does not allow the action; nothing went wrong."""
+    return ServiceValidationError(
         translation_domain=DOMAIN,
         translation_key=key,
         translation_placeholders=placeholders or None,
@@ -92,6 +104,8 @@ class WildflameCoordinator(DataUpdateCoordinator[WildflameStatus]):
             config_entry=entry,
             name=DOMAIN,
             update_interval=SCAN_INTERVAL,
+            # Only write entity states when the burner reports something new.
+            always_update=False,
         )
         self.client = client
         self._command_lock = asyncio.Lock()
@@ -198,14 +212,14 @@ class WildflameCoordinator(DataUpdateCoordinator[WildflameStatus]):
             if status.powered == on:
                 return
             if self._power_guard.active():
-                raise _error("power_command_pending")
+                raise _refused("power_command_pending")
             if on:
                 if status.child_lock:
-                    raise _error("child_lock_active")
+                    raise _refused("child_lock_active")
                 if status.state is BurnerState.COOLING:
-                    raise _error("cooling_down")
+                    raise _refused("cooling_down")
                 if status.state is BurnerState.UNKNOWN_PHASE:
-                    raise _error("unknown_phase", phase=str(status.phase))
+                    raise _refused("unknown_phase", phase=str(status.phase))
             await self._send(CODE_POWER_TOGGLE)
             self._power_guard.start(status.powered)
         await self.async_request_refresh()
@@ -216,7 +230,7 @@ class WildflameCoordinator(DataUpdateCoordinator[WildflameStatus]):
             if status.child_lock == locked:
                 return
             if self._child_lock_guard.active():
-                raise _error("child_lock_command_pending")
+                raise _refused("child_lock_command_pending")
             await self._send(CODE_CHILD_LOCK_TOGGLE)
             self._child_lock_guard.start(status.child_lock)
         await self.async_request_refresh()
@@ -226,9 +240,9 @@ class WildflameCoordinator(DataUpdateCoordinator[WildflameStatus]):
         async with self._command_lock:
             status = await self._fresh_status()
             if status.state is not BurnerState.BURNING:
-                raise _error("not_burning")
+                raise _refused("not_burning")
             if status.child_lock:
-                raise _error("child_lock_active")
+                raise _refused("child_lock_active")
             # Step one at a time and publish the burner's own reading after every step,
             # so the slider follows the flame (5 -> 4 -> 3 ...) instead of jumping at the end.
             # Bounded so a burner that ignores a step cannot keep us looping.

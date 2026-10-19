@@ -12,6 +12,9 @@ from .const import AUTO_OFF_MAX_HOURS
 from .coordinator import WildflameConfigEntry
 from .entity import WildflameEntity
 
+# The coordinator serialises all commands to the burner itself.
+PARALLEL_UPDATES = 0
+
 
 async def async_setup_entry(
     hass: HomeAssistant,

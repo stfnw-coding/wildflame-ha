@@ -65,8 +65,16 @@ een paar apparaten tegelijk; je telefoon hoeft niet met de haard verbonden te bl
 Kopieer `custom_components/wildflame` naar `/config/custom_components/wildflame` en herstart Home Assistant.
 
 ## Toevoegen
-**Instellingen → Apparaten en diensten → Integratie toevoegen → Wild Flame.** Laat het IP-adres op `192.168.4.1`
-staan. De integratie controleert direct of de haard bereikbaar is.
+**Instellingen → Apparaten en diensten → Integratie toevoegen → Wild Flame.**
+
+| Veld | Uitleg |
+|---|---|
+| IP-adres | Adres van de haard op zijn eigen wifi. Laat het op `192.168.4.1` staan, tenzij je het hebt veranderd. |
+
+De integratie controleert direct of de haard bereikbaar is. Het apparaat heet *Wild Flame*; geef het op de
+apparaatpagina een eigen naam (bijvoorbeeld "Haard") en laat Home Assistant de entiteit-ID's meeveranderen.
+
+Is het adres veranderd? Kies bij de integratie **⋮ → Opnieuw configureren**; verwijderen is niet nodig.
 
 ## Wat je kunt verwachten
 | Fase | Lampje | Status | Opmerking |
@@ -76,7 +84,37 @@ staan. De integratie controleert direct of de haard bereikbaar is.
 | Brandt | – | Brandt | Begint op stand 5, regelbaar 1–10 |
 | Afkoelen | rood knipperend | Afkoelen | Kan meer dan een uur duren. Niet aan te zetten of bij te vullen |
 
-Een automatisering op `sensor.<naam>_status` van `cooling` naar `off` is een handige manier om een melding te
-krijgen als de haard weer gebruikt of bijgevuld kan worden.
+## Voorbeelden
+- Een melding als de haard weer gebruikt of bijgevuld kan worden: trigger op `sensor.<naam>_status` die van
+  *Afkoelen* naar *Uit* gaat.
+- Een herinnering om bij te vullen: trigger op `binary_sensor.<naam>_brandstof_bijna_op` die aan gaat.
+- Zorgen dat de haard nooit de hele nacht brandt: zet *Automatisch uit na* op bijvoorbeeld 4 uur. Dit werkt
+  zonder automatisering, en ook als Home Assistant tussendoor herstart.
+- De haard uit als iedereen weg is: een automatisering op je aanwezigheidsdetectie die `switch.<naam>` uitzet.
+
+## Hoe vaak wordt de status bijgewerkt?
+Home Assistant vraagt elke 5 seconden de status op, en direct na elk commando. Wat je op de haard zelf
+of met de officiële app doet, zie je dus binnen een paar seconden terug.
+
+## Bekende beperkingen
+- De haard heeft alleen een eigen wifi; Home Assistant heeft een (tweede) wifi-verbinding daarmee nodig.
+- De haard kent alleen wissel- en stapcommando's. Daarom wordt een commando geweigerd zolang een vorig
+  aan/uit- of kinderslot-commando nog wordt verwerkt.
+- De vlamhoogte is alleen regelbaar als de haard brandt, niet tijdens het opwarmen.
+- Het brandstofniveau gaat in stappen van 10%.
+- Alleen de Smart Fire A6 is getest. Andere Smart Fire-modellen werken waarschijnlijk hetzelfde; laat het weten.
+
+## Problemen oplossen
+- **"Kan de haard niet bereiken" bij het toevoegen, of alle entiteiten niet beschikbaar**: controleer of Home
+  Assistant nog met het `WILDFLAME…`-wifi verbonden is (Instellingen → Systeem → Netwerk). De haard laat maar
+  een paar wifi-apparaten toe; een telefoon of tablet ervan loskoppelen kan helpen.
+- **"Onbekende fase"**: de haard meldt een fasecode die de integratie nog niet kent, mogelijk een storing.
+  Aanzetten is dan geblokkeerd. Meld de code en wat de haard laat zien in een issue.
+- Voeg bij een melding de diagnostiek toe: op de apparaatpagina **⋮ → Diagnostiek downloaden**.
+
+## Verwijderen
+1. **Instellingen → Apparaten en diensten → Wild Flame → ⋮ → Verwijderen.** Ook de opgeslagen
+   automatisch-uit-instelling wordt dan verwijderd.
+2. Via HACS geïnstalleerd? Verwijder **Wild Flame** dan ook in HACS en herstart Home Assistant.
 
 Het protocol staat beschreven in [PROTOCOL.md](PROTOCOL.md) (Engels).

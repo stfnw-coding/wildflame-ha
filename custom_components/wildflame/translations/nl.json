@@ -5,8 +5,20 @@
         "title": "Wild Flame-haard",
         "description": "De haard is alleen bereikbaar via zijn eigen wifi (WILDFLAME…). Verbind Home Assistant eerst met dat netwerk.",
         "data": {
-          "name": "Naam",
           "host": "IP-adres"
+        },
+        "data_description": {
+          "host": "Adres van de haard op zijn eigen wifi-netwerk. Dit is 192.168.4.1, tenzij je het hebt veranderd."
+        }
+      },
+      "reconfigure": {
+        "title": "Adres van de haard wijzigen",
+        "description": "Vul het nieuwe IP-adres van de haard in. Home Assistant controleert of de haard daar bereikbaar is.",
+        "data": {
+          "host": "IP-adres"
+        },
+        "data_description": {
+          "host": "Adres van de haard op zijn eigen wifi-netwerk. Dit is 192.168.4.1, tenzij je het hebt veranderd."
         }
       }
     },
@@ -14,7 +26,8 @@
       "cannot_connect": "Kan de haard niet bereiken. Is Home Assistant verbonden met de wifi van de haard?"
     },
     "abort": {
-      "already_configured": "Deze haard is al toegevoegd."
+      "already_configured": "Deze haard is al toegevoegd.",
+      "reconfigure_successful": "Het adres van de haard is bijgewerkt."
     }
   },
   "entity": {

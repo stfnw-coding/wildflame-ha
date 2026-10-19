@@ -67,8 +67,16 @@ The burner's Wi-Fi accepts only a few clients; your phone does not need to stay 
 Copy `custom_components/wildflame` to `/config/custom_components/wildflame` and restart Home Assistant.
 
 ## Setup
-**Settings → Devices & services → Add integration → Wild Flame.** Keep the IP address at `192.168.4.1`.
-The integration checks that the burner is reachable before it is added.
+**Settings → Devices & services → Add integration → Wild Flame.**
+
+| Field | Description |
+|---|---|
+| IP address | Address of the burner on its own Wi-Fi. Keep it at `192.168.4.1` unless you changed it. |
+
+The integration checks that the burner is reachable before it is added. The device is called *Wild Flame*;
+rename it (for example to "Fireplace") on the device page and let Home Assistant rename the entity IDs with it.
+
+Did the address change? Use **⋮ → Reconfigure** on the integration entry; there is no need to remove it.
 
 ## What to expect
 | Phase | LED | Status | Notes |
@@ -78,8 +86,38 @@ The integration checks that the burner is reachable before it is added.
 | Burning | – | Burning | Starts at level 5, adjustable 1–10 |
 | Cooling down | red, blinking | Cooling down | Can take over an hour. Cannot be switched on or refilled |
 
-An automation on `sensor.<name>_status` changing from `cooling` to `off` is a good way to get notified
-when the burner can be used or refilled again.
+## Examples
+- Get notified when the burner can be used or refilled again: trigger on `sensor.<name>_status` changing from
+  *Cooling down* to *Off*.
+- Get a reminder to refill: trigger on `binary_sensor.<name>_fuel_low` turning on.
+- Make sure the burner never burns all night: set *Auto-off after* to, for example, 4 hours. This works without
+  any automation and also when Home Assistant restarts in between.
+- Switch the burner off when everybody leaves home: an automation on your presence detection that turns off
+  `switch.<name>`.
+
+## Data updates
+Home Assistant asks the burner for its status every 5 seconds, and right after every command. Changes made on
+the burner itself or with the official app therefore show up within a few seconds.
+
+## Known limitations
+- The burner only offers its own Wi-Fi; Home Assistant needs a (second) Wi-Fi connection to it (see Requirements).
+- The burner only understands toggle and step commands, so commands are refused while a previous on/off or
+  child lock command is still being processed.
+- The flame level can only be changed while the burner is burning, not while it warms up.
+- The fuel level comes in steps of 10%.
+- Only the Smart Fire A6 has been tested. Other Smart Fire models probably work the same; please report it.
+
+## Troubleshooting
+- **"Cannot reach the burner" during setup, or all entities unavailable**: check that Home Assistant is still
+  connected to the `WILDFLAME…` Wi-Fi (Settings → System → Network). The burner accepts only a few Wi-Fi
+  clients; disconnecting a phone or tablet from it can help.
+- **"Unknown phase"**: the burner reports a phase code the integration does not know yet, possibly an error.
+  Switching on is blocked. Please open an issue with the code and what the burner shows.
+- When you report a problem, attach the diagnostics: on the device page, **⋮ → Download diagnostics**.
+
+## Removal
+1. **Settings → Devices & services → Wild Flame → ⋮ → Delete.** This also removes the stored auto-off setting.
+2. Installed with HACS? Remove **Wild Flame** in HACS as well and restart Home Assistant.
 
 ## How it works
 See [docs/PROTOCOL.md](docs/PROTOCOL.md) for the local HTTP protocol.

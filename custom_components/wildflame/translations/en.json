@@ -5,8 +5,20 @@
         "title": "Wild Flame burner",
         "description": "The burner is only reachable on its own Wi-Fi (WILDFLAME…). Connect Home Assistant to that network first.",
         "data": {
-          "name": "Name",
           "host": "IP address"
+        },
+        "data_description": {
+          "host": "Address of the burner on its own Wi-Fi network. This is 192.168.4.1 unless you changed it."
+        }
+      },
+      "reconfigure": {
+        "title": "Change the burner's address",
+        "description": "Enter the new IP address of the burner. Home Assistant checks that it can reach the burner there.",
+        "data": {
+          "host": "IP address"
+        },
+        "data_description": {
+          "host": "Address of the burner on its own Wi-Fi network. This is 192.168.4.1 unless you changed it."
         }
       }
     },
@@ -14,7 +26,8 @@
       "cannot_connect": "Cannot reach the burner. Is Home Assistant connected to the burner's Wi-Fi?"
     },
     "abort": {
-      "already_configured": "This burner is already configured."
+      "already_configured": "This burner is already configured.",
+      "reconfigure_successful": "The burner's address has been updated."
     }
   },
   "entity": {

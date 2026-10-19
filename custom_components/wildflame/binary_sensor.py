@@ -17,6 +17,9 @@ from .const import FUEL_LOW_PERCENT
 from .coordinator import WildflameConfigEntry, WildflameCoordinator
 from .entity import WildflameEntity
 
+# Data comes from the coordinator.
+PARALLEL_UPDATES = 0
+
 
 @dataclass(frozen=True, kw_only=True)
 class WildflameBinarySensorDescription(BinarySensorEntityDescription):
