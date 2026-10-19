@@ -118,10 +118,10 @@ class WildflameStatusSensor(WildflameSensor):
 
 
 class WildflameOnSinceSensor(WildflameEntity, SensorEntity):
-    """When the burner was switched on; empty while it is off. Survives a restart."""
+    """When the burner was last switched on; kept after it goes off. Survives a restart."""
 
     _attr_device_class = SensorDeviceClass.TIMESTAMP
 
     @property
     def native_value(self) -> datetime | None:
-        return self.coordinator.powered_since
+        return self.coordinator.last_switched_on

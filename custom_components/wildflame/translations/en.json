@@ -69,7 +69,7 @@
         "name": "Phase code"
       },
       "on_since": {
-        "name": "On since"
+        "name": "Last switched on"
       }
     }
   },

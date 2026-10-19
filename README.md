@@ -17,7 +17,7 @@ Home Assistant. No cloud: Home Assistant talks directly to the burner over the b
 | `switch.<name>` | Turn the burner on or off |
 | `number.<name>_flame_level` | Flame level 1–10 (unavailable unless the burner is burning) |
 | `sensor.<name>_status` | Off / Warming up / Burning / Cooling down / Unknown phase, with a `since` attribute |
-| `sensor.<name>_on_since` | When the burner was switched on (empty while off) |
+| `sensor.<name>_last_switched_on` | When the burner was last switched on (kept after it goes off) |
 | `sensor.<name>_fuel_level` | Fuel level in % (steps of 10%) |
 | `binary_sensor.<name>_fuel_low` | On at 10% fuel or less |
 | `sensor.<name>_room_temperature` | Room temperature in °C |

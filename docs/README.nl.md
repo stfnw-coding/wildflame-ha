@@ -15,7 +15,7 @@ Home Assistant. Geen cloud: Home Assistant praat rechtstreeks met de haard via d
 | `switch.<naam>` | Haard aan/uit |
 | `number.<naam>_vlamhoogte` | Vlamhoogte 1–10 (niet beschikbaar als de haard niet brandt) |
 | `sensor.<naam>_status` | Uit / Opwarmen / Brandt / Afkoelen / Onbekende fase, met eigenschap `since` |
-| `sensor.<naam>_aan_sinds` | Wanneer de haard is aangezet (leeg als hij uit staat) |
+| `sensor.<naam>_laatst_aangezet` | Wanneer de haard voor het laatst is aangezet (blijft staan als hij uit gaat) |
 | `sensor.<naam>_brandstofniveau` | Brandstof in % (stappen van 10%) |
 | `binary_sensor.<naam>_brandstof_bijna_op` | Aan bij 10% brandstof of minder |
 | `sensor.<naam>_kamertemperatuur` | Kamertemperatuur in °C |

@@ -21,7 +21,7 @@ SWITCH = "switch.haard"
 FLAME = "number.haard_vlamhoogte"
 STATUS = "sensor.haard_status"
 CHILD_LOCK = "lock.haard_kinderslot"
-ON_SINCE = "sensor.haard_aan_sinds"
+ON_SINCE = "sensor.haard_laatst_aangezet"
 AUTO_OFF = "number.haard_automatisch_uit_na"
 FUEL_LOW = "binary_sensor.haard_brandstof_bijna_op"
 
@@ -99,7 +99,7 @@ async def test_on_since(hass: HomeAssistant, entry, burner) -> None:
     assert dt_util.parse_datetime(hass.states.get(ON_SINCE).state) == on_since  # warming up counts
 
     await call(hass, "switch", "turn_off", SWITCH)
-    assert hass.states.get(ON_SINCE).state == "unknown"
+    assert dt_util.parse_datetime(hass.states.get(ON_SINCE).state) == on_since  # kept while off
 
 
 async def test_on_since_restored_after_restart(hass: HomeAssistant, entry, burner, hass_storage) -> None:
@@ -129,6 +129,17 @@ async def test_on_since_not_restored_after_long_gap(hass: HomeAssistant, entry, 
     }
     await setup(hass, entry)
     assert dt_util.parse_datetime(hass.states.get(ON_SINCE).state) > old + timedelta(days=1)
+
+
+async def test_last_switched_on_restored_while_off(hass: HomeAssistant, entry, burner, hass_storage) -> None:
+    last_on = dt_util.utcnow() - timedelta(days=3)
+    hass_storage[f"{DOMAIN}.{entry.entry_id}"] = {
+        "version": 1,
+        "key": f"{DOMAIN}.{entry.entry_id}",
+        "data": {"auto_off_hours": 0, "powered_since": None, "last_seen": None, "last_switched_on": last_on.isoformat()},
+    }
+    await setup(hass, entry)
+    assert dt_util.parse_datetime(hass.states.get(ON_SINCE).state) == last_on.replace(microsecond=0)
 
 
 async def test_auto_off(hass: HomeAssistant, entry, burner) -> None:

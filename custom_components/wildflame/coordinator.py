@@ -101,6 +101,8 @@ class WildflameCoordinator(DataUpdateCoordinator[WildflameStatus]):
             hass, STORAGE_VERSION, f"{DOMAIN}.{entry.entry_id}"
         )
         self.powered_since: datetime | None = None
+        # Unlike powered_since this is kept after switching off, so it never goes blank.
+        self.last_switched_on: datetime | None = None
         self.auto_off_hours: float = 0
         self._auto_off_attempt: float | None = None
         self._last_save = 0.0
@@ -109,6 +111,9 @@ class WildflameCoordinator(DataUpdateCoordinator[WildflameStatus]):
     async def _async_setup(self) -> None:
         stored = await self._store.async_load() or {}
         self.auto_off_hours = float(stored.get("auto_off_hours", 0))
+        self.last_switched_on = dt_util.parse_datetime(
+            stored.get("last_switched_on") or stored.get("powered_since") or ""
+        )
         # Only trust the stored start time if Home Assistant saw the burner burning just before
         # it went down; otherwise it may have been switched off and on again in between.
         last_seen = dt_util.parse_datetime(stored.get("last_seen") or "")
@@ -137,7 +142,7 @@ class WildflameCoordinator(DataUpdateCoordinator[WildflameStatus]):
     def _track_powered(self, status: WildflameStatus) -> None:
         if status.powered:
             if self.powered_since is None:
-                self.powered_since = dt_util.utcnow()
+                self.powered_since = self.last_switched_on = dt_util.utcnow()
                 self._save()
             elif time.monotonic() - self._last_save > STORAGE_SAVE_INTERVAL_SECONDS:
                 self._save()  # refreshes last_seen
@@ -155,6 +160,7 @@ class WildflameCoordinator(DataUpdateCoordinator[WildflameStatus]):
             "auto_off_hours": self.auto_off_hours,
             "powered_since": self.powered_since.isoformat() if self.powered_since else None,
             "last_seen": dt_util.utcnow().isoformat() if self.powered_since else None,
+            "last_switched_on": self.last_switched_on.isoformat() if self.last_switched_on else None,
         }
 
     async def async_set_auto_off_hours(self, hours: float) -> None:
