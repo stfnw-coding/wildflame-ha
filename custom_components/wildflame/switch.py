@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from typing import Any
+from typing import Any, override
 
 from homeassistant.components.switch import SwitchEntity
 from homeassistant.core import HomeAssistant
@@ -27,11 +27,14 @@ class WildflamePowerSwitch(WildflameEntity, SwitchEntity):
     _attr_name = None  # main feature: entity takes the device name
 
     @property
+    @override
     def is_on(self) -> bool:
         return self.coordinator.data.powered
 
+    @override
     async def async_turn_on(self, **kwargs: Any) -> None:
         await self.coordinator.async_set_power(True)
 
+    @override
     async def async_turn_off(self, **kwargs: Any) -> None:
         await self.coordinator.async_set_power(False)

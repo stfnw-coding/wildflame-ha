@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from typing import Any
+from typing import Any, override
 
 from homeassistant.components.lock import LockEntity
 from homeassistant.core import HomeAssistant
@@ -25,11 +25,14 @@ async def async_setup_entry(
 
 class WildflameChildLock(WildflameEntity, LockEntity):
     @property
+    @override
     def is_locked(self) -> bool:
         return self.coordinator.data.child_lock
 
+    @override
     async def async_lock(self, **kwargs: Any) -> None:
         await self.coordinator.async_set_child_lock(True)
 
+    @override
     async def async_unlock(self, **kwargs: Any) -> None:
         await self.coordinator.async_set_child_lock(False)

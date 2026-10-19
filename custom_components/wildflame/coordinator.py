@@ -6,7 +6,7 @@ import asyncio
 from datetime import datetime, timedelta
 import logging
 import time
-from typing import Any
+from typing import Any, override
 
 from homeassistant.config_entries import ConfigEntry
 from homeassistant.core import HomeAssistant
@@ -122,6 +122,7 @@ class WildflameCoordinator(DataUpdateCoordinator[WildflameStatus]):
         self._last_save = 0.0
         self._warned_phases: set[int] = set()
 
+    @override
     async def _async_setup(self) -> None:
         stored = await self._store.async_load() or {}
         self.auto_off_hours = float(stored.get("auto_off_hours", 0))
@@ -134,6 +135,7 @@ class WildflameCoordinator(DataUpdateCoordinator[WildflameStatus]):
         if last_seen and dt_util.utcnow() - last_seen < POWERED_SINCE_MAX_GAP:
             self.powered_since = dt_util.parse_datetime(stored.get("powered_since") or "")
 
+    @override
     async def _async_update_data(self) -> WildflameStatus:
         try:
             status = await self.client.get_status()

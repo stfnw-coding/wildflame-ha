@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from typing import Any
+from typing import TYPE_CHECKING, Any, cast, override
 
 import voluptuous as vol
 
@@ -13,12 +13,20 @@ from homeassistant.helpers.aiohttp_client import async_get_clientsession
 from .api import DEFAULT_HOST, WildflameClient, WildflameError
 from .const import DOMAIN, MANUFACTURER
 
-SCHEMA = vol.Schema({vol.Required(CONF_HOST, default=DEFAULT_HOST): str})
+if TYPE_CHECKING:
+    import probatio
+
+# HA 2026.9 types flow schemas as probatio.Schema; voluptuous is API-compatible
+# and keeps older HA versions working.
+SCHEMA = cast(
+    "probatio.Schema", vol.Schema({vol.Required(CONF_HOST, default=DEFAULT_HOST): str})
+)
 
 
 class WildflameConfigFlow(ConfigFlow, domain=DOMAIN):
     VERSION = 1
 
+    @override
     async def async_step_user(
         self, user_input: dict[str, Any] | None = None
     ) -> ConfigFlowResult:

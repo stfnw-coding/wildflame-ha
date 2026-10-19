@@ -5,7 +5,7 @@ from __future__ import annotations
 from collections.abc import Callable
 from dataclasses import dataclass
 from datetime import datetime
-from typing import Any
+from typing import Any, override
 
 from homeassistant.components.sensor import (
     SensorDeviceClass,
@@ -94,6 +94,7 @@ class WildflameSensor(WildflameEntity, SensorEntity):
         self.entity_description = description
 
     @property
+    @override
     def native_value(self) -> float | str | None:
         return self.entity_description.value_fn(self.coordinator.data)
 
@@ -102,20 +103,23 @@ class WildflameStatusSensor(WildflameSensor):
     """Status with the time it was entered, e.g. to show how long the burner has been warming up."""
 
     _since: datetime | None = None
-    _last: str | None = None
+    _last: float | str | None = None
 
     @callback
+    @override
     def _handle_coordinator_update(self) -> None:
         value = self.native_value
         if value != self._last:
             self._last, self._since = value, dt_util.utcnow()
         super()._handle_coordinator_update()
 
+    @override
     async def async_added_to_hass(self) -> None:
         await super().async_added_to_hass()
         self._last, self._since = self.native_value, dt_util.utcnow()
 
     @property
+    @override
     def extra_state_attributes(self) -> dict[str, Any]:
         return {"since": self._since.isoformat() if self._since else None}
 
@@ -126,5 +130,6 @@ class WildflameOnSinceSensor(WildflameEntity, SensorEntity):
     _attr_device_class = SensorDeviceClass.TIMESTAMP
 
     @property
+    @override
     def native_value(self) -> datetime | None:
         return self.coordinator.last_switched_on

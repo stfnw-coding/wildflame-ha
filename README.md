@@ -128,6 +128,7 @@ Own a different Wild Flame model? Issues with your burner's status line (from
 
 ```bash
 pip install -r requirements_test.txt
+mypy
 pytest
 ```
 The tests use a fake burner (`tests/fake_burner.py`) that answers like the real one.
