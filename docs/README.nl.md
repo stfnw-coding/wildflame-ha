@@ -15,7 +15,6 @@ Home Assistant. Geen cloud: Home Assistant praat rechtstreeks met de haard via d
 | `switch.<naam>` | Haard aan/uit |
 | `number.<naam>_vlamhoogte` | Vlamhoogte 1–10 (niet beschikbaar als de haard niet brandt) |
 | `sensor.<naam>_status` | Uit / Opwarmen / Brandt / Afkoelen / Onbekende fase |
-| `sensor.<naam>_laatst_aangezet` | Wanneer de haard voor het laatst is aangezet (blijft staan als hij uit gaat) |
 | `sensor.<naam>_brandstofniveau` | Brandstof in % (stappen van 10%) |
 | `binary_sensor.<naam>_brandstof_bijna_op` | Aan bij 10% brandstof of minder |
 | `sensor.<naam>_kamertemperatuur` | Kamertemperatuur in °C |
@@ -91,6 +90,7 @@ Is het adres veranderd? Kies bij de integratie **⋮ → Opnieuw configureren**;
   wachttijd opnieuw.
 - Zien hoe lang de haard al aan het opwarmen of afkoelen is: het tijdstip *laatst gewijzigd* van
   `sensor.<naam>_status`, te zien in het venster en de geschiedenis van die entiteit.
+- Zien wanneer de haard aan- en uitging: de geschiedenis en het logboek van `switch.<naam>`.
 - De haard uit als iedereen weg is: een automatisering op je aanwezigheidsdetectie die `switch.<naam>` uitzet.
 
 ## Hoe vaak wordt de status bijgewerkt?
@@ -114,8 +114,7 @@ of met de officiële app doet, zie je dus binnen een paar seconden terug.
 - Voeg bij een melding de diagnostiek toe: op de apparaatpagina **⋮ → Diagnostiek downloaden**.
 
 ## Verwijderen
-1. **Instellingen → Apparaten en diensten → Wild Flame → ⋮ → Verwijderen.** Ook het opgeslagen tijdstip
-   *laatst aangezet* wordt dan verwijderd.
+1. **Instellingen → Apparaten en diensten → Wild Flame → ⋮ → Verwijderen.**
 2. Via HACS geïnstalleerd? Verwijder **Wild Flame** dan ook in HACS en herstart Home Assistant.
 
 Het protocol staat beschreven in [PROTOCOL.md](PROTOCOL.md) (Engels).

@@ -17,9 +17,3 @@ FLAME_STEP_DELAY_SECONDS = 1.0
 
 # Fuel level (%) at or below which the "fuel low" problem sensor turns on.
 FUEL_LOW_PERCENT = 10
-
-# Stored "on since" time. It is kept across a Home Assistant restart only if the burner was
-# seen burning shortly before; otherwise it may have been switched off and on in between.
-STORAGE_VERSION = 1
-STORAGE_SAVE_INTERVAL_SECONDS = 60
-POWERED_SINCE_MAX_GAP = timedelta(minutes=10)

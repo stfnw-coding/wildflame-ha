@@ -24,6 +24,4 @@ async def async_get_config_entry_diagnostics(
         }
         if status
         else None,
-        "powered_since": coordinator.powered_since,
-        "last_switched_on": coordinator.last_switched_on,
     }

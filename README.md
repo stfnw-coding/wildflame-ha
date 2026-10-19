@@ -17,7 +17,6 @@ Home Assistant. No cloud: Home Assistant talks directly to the burner over the b
 | `switch.<name>` | Turn the burner on or off |
 | `number.<name>_flame_level` | Flame level 1–10 (unavailable unless the burner is burning) |
 | `sensor.<name>_status` | Off / Warming up / Burning / Cooling down / Unknown phase |
-| `sensor.<name>_last_switched_on` | When the burner was last switched on (kept after it goes off) |
 | `sensor.<name>_fuel_level` | Fuel level in % (steps of 10%) |
 | `binary_sensor.<name>_fuel_low` | On at 10% fuel or less |
 | `sensor.<name>_room_temperature` | Room temperature in °C |
@@ -92,6 +91,7 @@ Did the address change? Use **⋮ → Reconfigure** on the integration entry; th
   restarts itself.
 - See how long the burner has been warming up or cooling down: the *last changed* time of
   `sensor.<name>_status`, shown in its dialog and history.
+- See when the burner was switched on and off: the history and logbook of `switch.<name>`.
 - Switch the burner off when everybody leaves home: an automation on your presence detection that turns off
   `switch.<name>`.
 
@@ -116,7 +116,7 @@ the burner itself or with the official app therefore show up within a few second
 - When you report a problem, attach the diagnostics: on the device page, **⋮ → Download diagnostics**.
 
 ## Removal
-1. **Settings → Devices & services → Wild Flame → ⋮ → Delete.** This also removes the stored *last switched on* time.
+1. **Settings → Devices & services → Wild Flame → ⋮ → Delete.**
 2. Installed with HACS? Remove **Wild Flame** in HACS as well and restart Home Assistant.
 
 ## How it works

@@ -4,7 +4,6 @@ from __future__ import annotations
 
 from collections.abc import Callable
 from dataclasses import dataclass
-from datetime import datetime
 from typing import override
 
 from homeassistant.components.sensor import (
@@ -71,13 +70,7 @@ async def async_setup_entry(
     entry: WildflameConfigEntry,
     async_add_entities: AddConfigEntryEntitiesCallback,
 ) -> None:
-    coordinator = entry.runtime_data
-    async_add_entities(
-        [
-            *(WildflameSensor(coordinator, desc) for desc in SENSORS),
-            WildflameOnSinceSensor(coordinator, "on_since"),
-        ]
-    )
+    async_add_entities(WildflameSensor(entry.runtime_data, desc) for desc in SENSORS)
 
 
 class WildflameSensor(WildflameEntity, SensorEntity):
@@ -93,14 +86,3 @@ class WildflameSensor(WildflameEntity, SensorEntity):
     @override
     def native_value(self) -> float | str | None:
         return self.entity_description.value_fn(self.coordinator.data)
-
-
-class WildflameOnSinceSensor(WildflameEntity, SensorEntity):
-    """When the burner was last switched on; kept after it goes off. Survives a restart."""
-
-    _attr_device_class = SensorDeviceClass.TIMESTAMP
-
-    @property
-    @override
-    def native_value(self) -> datetime | None:
-        return self.coordinator.last_switched_on

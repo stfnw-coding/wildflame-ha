@@ -72,9 +72,6 @@
       },
       "phase": {
         "name": "Phase code"
-      },
-      "on_since": {
-        "name": "Last switched on"
       }
     }
   },

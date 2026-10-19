@@ -1,13 +1,11 @@
 """Tests for the Home Assistant entities and command safety."""
 
-from datetime import timedelta
 from unittest.mock import patch
 
 import pytest
 from homeassistant.core import HomeAssistant
 from homeassistant.exceptions import HomeAssistantError, ServiceValidationError
 from homeassistant.helpers import entity_registry as er
-from homeassistant.util import dt as dt_util
 
 from custom_components.wildflame.api import (
     WildflameConnectionError,
@@ -22,7 +20,6 @@ SWITCH = "switch.haard"
 FLAME = "number.haard_vlamhoogte"
 STATUS = "sensor.haard_status"
 CHILD_LOCK = "lock.haard_kinderslot"
-ON_SINCE = "sensor.haard_laatst_aangezet"
 FUEL_LOW = "binary_sensor.haard_brandstof_bijna_op"
 
 
@@ -55,7 +52,6 @@ async def test_entities_created(hass: HomeAssistant, entry, burner) -> None:
     assert hass.states.get("sensor.haard_luchtvochtigheid").state == "45.0"
     assert hass.states.get(CHILD_LOCK).state == "unlocked"
     assert hass.states.get(FLAME).state == "unavailable"  # only adjustable while burning
-    assert hass.states.get(ON_SINCE).state == "unknown"
     assert hass.states.get(FUEL_LOW).state == "off"
 
 
@@ -82,58 +78,6 @@ async def test_turn_on_and_off(hass: HomeAssistant, entry, burner) -> None:
     assert len(burner.commands) == 2
 
 
-async def test_on_since(hass: HomeAssistant, entry, burner) -> None:
-    await setup(hass, entry)
-    before = dt_util.utcnow()
-    await call(hass, "switch", "turn_on", SWITCH)
-    on_since = dt_util.parse_datetime(hass.states.get(ON_SINCE).state)
-    assert on_since >= before.replace(microsecond=0)
-
-    burner.ignite()
-    await entry.runtime_data.async_refresh()
-    await hass.async_block_till_done()
-    assert dt_util.parse_datetime(hass.states.get(ON_SINCE).state) == on_since  # warming up counts
-
-    await call(hass, "switch", "turn_off", SWITCH)
-    assert dt_util.parse_datetime(hass.states.get(ON_SINCE).state) == on_since  # kept while off
-
-
-async def test_on_since_restored_after_restart(hass: HomeAssistant, entry, burner, hass_storage) -> None:
-    burner.powered, burner.phase, burner.flame = 1, 0, 5
-    on_since = dt_util.utcnow() - timedelta(hours=2)
-    hass_storage[f"{DOMAIN}.{entry.entry_id}"] = {
-        "version": 1,
-        "key": f"{DOMAIN}.{entry.entry_id}",
-        "data": {
-            "powered_since": on_since.isoformat(),
-            "last_seen": (dt_util.utcnow() - timedelta(minutes=1)).isoformat(),
-        },
-    }
-    await setup(hass, entry)
-    assert dt_util.parse_datetime(hass.states.get(ON_SINCE).state) == on_since.replace(microsecond=0)
-
-
-async def test_on_since_not_restored_after_long_gap(hass: HomeAssistant, entry, burner, hass_storage) -> None:
-    burner.powered, burner.phase, burner.flame = 1, 0, 5
-    old = dt_util.utcnow() - timedelta(days=2)
-    hass_storage[f"{DOMAIN}.{entry.entry_id}"] = {
-        "version": 1,
-        "key": f"{DOMAIN}.{entry.entry_id}",
-        "data": {"powered_since": old.isoformat(), "last_seen": old.isoformat()},
-    }
-    await setup(hass, entry)
-    assert dt_util.parse_datetime(hass.states.get(ON_SINCE).state) > old + timedelta(days=1)
-
-
-async def test_last_switched_on_restored_while_off(hass: HomeAssistant, entry, burner, hass_storage) -> None:
-    last_on = dt_util.utcnow() - timedelta(days=3)
-    hass_storage[f"{DOMAIN}.{entry.entry_id}"] = {
-        "version": 1,
-        "key": f"{DOMAIN}.{entry.entry_id}",
-        "data": {"powered_since": None, "last_seen": None, "last_switched_on": last_on.isoformat()},
-    }
-    await setup(hass, entry)
-    assert dt_util.parse_datetime(hass.states.get(ON_SINCE).state) == last_on.replace(microsecond=0)
 
 
 
@@ -167,7 +111,11 @@ async def test_old_entities_removed(hass: HomeAssistant, entry, burner) -> None:
     registry = er.async_get(hass)
     old = [
         registry.async_get_or_create(platform, DOMAIN, f"{entry.entry_id}_{key}", config_entry=entry)
-        for platform, key in (("binary_sensor", "child_lock"), ("number", "auto_off"))
+        for platform, key in (
+            ("binary_sensor", "child_lock"),
+            ("number", "auto_off"),
+            ("sensor", "on_since"),
+        )
     ]
     await setup(hass, entry)
     assert all(registry.async_get(entity.entity_id) is None for entity in old)
@@ -333,14 +281,15 @@ async def test_command_failed(hass: HomeAssistant, entry, burner) -> None:
     assert err.value.translation_key == "command_failed"
 
 
-async def test_unload_and_remove(hass: HomeAssistant, entry, burner, hass_storage) -> None:
+async def test_old_storage_removed(hass: HomeAssistant, entry, burner, hass_storage) -> None:
+    """Up to 0.4.0 the integration kept its own storage file."""
+    key = f"{DOMAIN}.{entry.entry_id}"
+    hass_storage[key] = {"version": 1, "key": key, "data": {"powered_since": None}}
     await setup(hass, entry)
-    await call(hass, "switch", "turn_on", SWITCH)  # stores when it was switched on
-    assert f"{DOMAIN}.{entry.entry_id}" in hass_storage
+    assert key not in hass_storage
 
+
+async def test_unload(hass: HomeAssistant, entry, burner) -> None:
+    await setup(hass, entry)
     assert await hass.config_entries.async_unload(entry.entry_id)
     assert hass.states.get(SWITCH).state == "unavailable"
-
-    await hass.config_entries.async_remove(entry.entry_id)
-    await hass.async_block_till_done()
-    assert f"{DOMAIN}.{entry.entry_id}" not in hass_storage

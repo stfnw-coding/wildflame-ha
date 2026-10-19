@@ -17,9 +17,6 @@
       "fuel_level": {
         "default": "mdi:fuel"
       },
-      "on_since": {
-        "default": "mdi:clock-start"
-      },
       "phase": {
         "default": "mdi:numeric"
       },

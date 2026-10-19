@@ -3,17 +3,14 @@
 from __future__ import annotations
 
 import asyncio
-from datetime import datetime
 import logging
 import time
-from typing import Any, override
+from typing import override
 
 from homeassistant.config_entries import ConfigEntry
 from homeassistant.core import HomeAssistant
 from homeassistant.exceptions import HomeAssistantError, ServiceValidationError
-from homeassistant.helpers.storage import Store
 from homeassistant.helpers.update_coordinator import DataUpdateCoordinator, UpdateFailed
-from homeassistant.util import dt as dt_util
 
 from .api import (
     CODE_CHILD_LOCK_TOGGLE,
@@ -31,10 +28,7 @@ from .const import (
     DOMAIN,
     FLAME_STEP_DELAY_SECONDS,
     POWER_TOGGLE_GUARD_SECONDS,
-    POWERED_SINCE_MAX_GAP,
     SCAN_INTERVAL,
-    STORAGE_SAVE_INTERVAL_SECONDS,
-    STORAGE_VERSION,
 )
 
 _LOGGER = logging.getLogger(__name__)
@@ -110,26 +104,7 @@ class WildflameCoordinator(DataUpdateCoordinator[WildflameStatus]):
         self._command_lock = asyncio.Lock()
         self._power_guard = _ToggleGuard()
         self._child_lock_guard = _ToggleGuard()
-        self._store: Store[dict[str, Any]] = Store(
-            hass, STORAGE_VERSION, f"{DOMAIN}.{entry.entry_id}"
-        )
-        self.powered_since: datetime | None = None
-        # Unlike powered_since this is kept after switching off, so it never goes blank.
-        self.last_switched_on: datetime | None = None
-        self._last_save = 0.0
         self._warned_phases: set[int] = set()
-
-    @override
-    async def _async_setup(self) -> None:
-        stored = await self._store.async_load() or {}
-        self.last_switched_on = dt_util.parse_datetime(
-            stored.get("last_switched_on") or stored.get("powered_since") or ""
-        )
-        # Only trust the stored start time if Home Assistant saw the burner burning just before
-        # it went down; otherwise it may have been switched off and on again in between.
-        last_seen = dt_util.parse_datetime(stored.get("last_seen") or "")
-        if last_seen and dt_util.utcnow() - last_seen < POWERED_SINCE_MAX_GAP:
-            self.powered_since = dt_util.parse_datetime(stored.get("powered_since") or "")
 
     @override
     async def _async_update_data(self) -> WildflameStatus:
@@ -139,7 +114,6 @@ class WildflameCoordinator(DataUpdateCoordinator[WildflameStatus]):
             raise UpdateFailed(str(err)) from err
         self._power_guard.observe(status.powered)
         self._child_lock_guard.observe(status.child_lock)
-        self._track_powered(status)
         if status.state is BurnerState.UNKNOWN_PHASE and status.phase not in self._warned_phases:
             self._warned_phases.add(status.phase)
             _LOGGER.warning(
@@ -149,28 +123,6 @@ class WildflameCoordinator(DataUpdateCoordinator[WildflameStatus]):
                 "https://github.com/stfnw-coding/wildflame-ha/issues",
             )
         return status
-
-    def _track_powered(self, status: WildflameStatus) -> None:
-        if status.powered:
-            if self.powered_since is None:
-                self.powered_since = self.last_switched_on = dt_util.utcnow()
-                self._save()
-            elif time.monotonic() - self._last_save > STORAGE_SAVE_INTERVAL_SECONDS:
-                self._save()  # refreshes last_seen
-        elif self.powered_since is not None:
-            self.powered_since = None
-            self._save()
-
-    def _save(self) -> None:
-        self._last_save = time.monotonic()
-        self._store.async_delay_save(self._storage_data, 0)
-
-    def _storage_data(self) -> dict[str, Any]:
-        return {
-            "powered_since": self.powered_since.isoformat() if self.powered_since else None,
-            "last_seen": dt_util.utcnow().isoformat() if self.powered_since else None,
-            "last_switched_on": self.last_switched_on.isoformat() if self.last_switched_on else None,
-        }
 
     async def async_set_power(self, on: bool) -> None:
         async with self._command_lock:
