@@ -9,9 +9,6 @@
       }
     },
     "number": {
-      "auto_off": {
-        "default": "mdi:timer-off-outline"
-      },
       "flame_level": {
         "default": "mdi:fire"
       }

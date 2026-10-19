@@ -26,7 +26,7 @@ async def async_setup_entry(hass: HomeAssistant, entry: WildflameConfigEntry) ->
     session = async_create_clientsession(hass, auto_cleanup=True)
     client = WildflameClient(session, entry.data[CONF_HOST])
     coordinator = WildflameCoordinator(hass, entry, client)
-    _remove_read_only_child_lock(hass, entry)
+    _remove_old_entities(hass, entry)
     await coordinator.async_config_entry_first_refresh()
     entry.runtime_data = coordinator
     await hass.config_entries.async_forward_entry_setups(entry, PLATFORMS)
@@ -41,10 +41,17 @@ async def async_remove_entry(hass: HomeAssistant, entry: WildflameConfigEntry) -
     await Store(hass, STORAGE_VERSION, f"{DOMAIN}.{entry.entry_id}").async_remove()
 
 
-def _remove_read_only_child_lock(hass: HomeAssistant, entry: WildflameConfigEntry) -> None:
-    """0.1.x showed the child lock as a binary sensor; it is a lock entity since 0.2.0."""
+# Entities from earlier versions that no longer exist.
+_OLD_ENTITIES: tuple[tuple[Platform, str], ...] = (
+    # 0.1.x showed the child lock as a binary sensor; it is a lock entity since 0.2.0.
+    (Platform.BINARY_SENSOR, "child_lock"),
+    # The auto-off time was removed in 0.4.0; an automation does the same.
+    (Platform.NUMBER, "auto_off"),
+)
+
+
+def _remove_old_entities(hass: HomeAssistant, entry: WildflameConfigEntry) -> None:
     registry = er.async_get(hass)
-    if entity_id := registry.async_get_entity_id(
-        Platform.BINARY_SENSOR, DOMAIN, f"{entry.entry_id}_child_lock"
-    ):
-        registry.async_remove(entity_id)
+    for platform, key in _OLD_ENTITIES:
+        if entity_id := registry.async_get_entity_id(platform, DOMAIN, f"{entry.entry_id}_{key}"):
+            registry.async_remove(entity_id)

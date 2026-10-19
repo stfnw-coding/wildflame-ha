@@ -5,7 +5,7 @@ from __future__ import annotations
 from collections.abc import Callable
 from dataclasses import dataclass
 from datetime import datetime
-from typing import Any, override
+from typing import override
 
 from homeassistant.components.sensor import (
     SensorDeviceClass,
@@ -14,9 +14,8 @@ from homeassistant.components.sensor import (
     SensorStateClass,
 )
 from homeassistant.const import PERCENTAGE, EntityCategory, UnitOfTemperature
-from homeassistant.core import HomeAssistant, callback
+from homeassistant.core import HomeAssistant
 from homeassistant.helpers.entity_platform import AddConfigEntryEntitiesCallback
-from homeassistant.util import dt as dt_util
 
 from .api import BurnerState, WildflameStatus
 from .coordinator import WildflameConfigEntry, WildflameCoordinator
@@ -75,10 +74,7 @@ async def async_setup_entry(
     coordinator = entry.runtime_data
     async_add_entities(
         [
-            *(
-                (WildflameStatusSensor if desc.key == "status" else WildflameSensor)(coordinator, desc)
-                for desc in SENSORS
-            ),
+            *(WildflameSensor(coordinator, desc) for desc in SENSORS),
             WildflameOnSinceSensor(coordinator, "on_since"),
         ]
     )
@@ -97,31 +93,6 @@ class WildflameSensor(WildflameEntity, SensorEntity):
     @override
     def native_value(self) -> float | str | None:
         return self.entity_description.value_fn(self.coordinator.data)
-
-
-class WildflameStatusSensor(WildflameSensor):
-    """Status with the time it was entered, e.g. to show how long the burner has been warming up."""
-
-    _since: datetime | None = None
-    _last: float | str | None = None
-
-    @callback
-    @override
-    def _handle_coordinator_update(self) -> None:
-        value = self.native_value
-        if value != self._last:
-            self._last, self._since = value, dt_util.utcnow()
-        super()._handle_coordinator_update()
-
-    @override
-    async def async_added_to_hass(self) -> None:
-        await super().async_added_to_hass()
-        self._last, self._since = self.native_value, dt_util.utcnow()
-
-    @property
-    @override
-    def extra_state_attributes(self) -> dict[str, Any]:
-        return {"since": self._since.isoformat() if self._since else None}
 
 
 class WildflameOnSinceSensor(WildflameEntity, SensorEntity):

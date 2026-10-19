@@ -14,14 +14,13 @@ Home Assistant. Geen cloud: Home Assistant praat rechtstreeks met de haard via d
 |---|---|
 | `switch.<naam>` | Haard aan/uit |
 | `number.<naam>_vlamhoogte` | Vlamhoogte 1–10 (niet beschikbaar als de haard niet brandt) |
-| `sensor.<naam>_status` | Uit / Opwarmen / Brandt / Afkoelen / Onbekende fase, met eigenschap `since` |
+| `sensor.<naam>_status` | Uit / Opwarmen / Brandt / Afkoelen / Onbekende fase |
 | `sensor.<naam>_laatst_aangezet` | Wanneer de haard voor het laatst is aangezet (blijft staan als hij uit gaat) |
 | `sensor.<naam>_brandstofniveau` | Brandstof in % (stappen van 10%) |
 | `binary_sensor.<naam>_brandstof_bijna_op` | Aan bij 10% brandstof of minder |
 | `sensor.<naam>_kamertemperatuur` | Kamertemperatuur in °C |
 | `sensor.<naam>_luchtvochtigheid` | Luchtvochtigheid in % |
 | `lock.<naam>_kinderslot` | Kinderslot op de haard: vergrendelen of ontgrendelen |
-| `number.<naam>_automatisch_uit_na` | Zet de haard uit na zoveel uur (0 = nooit; instelling) |
 | `sensor.<naam>_fasecode` | Ruwe fasecode (diagnostisch) |
 
 ### Veiligheid
@@ -32,7 +31,6 @@ daarom altijd eerst de status en stuurt alleen een commando als dat nodig is:
   in het logboek zodat hij kan worden toegevoegd;
 - na een aan/uit- of kinderslot-commando wordt 30 seconden geen tweede gestuurd tot de haard de nieuwe toestand
   meldt;
-- de optionele tijd "Automatisch uit na" zet de haard uit als hij zo lang aan staat, ook zonder automatisering;
 - de vlamhoogte gaat in losse stappen van 1 met een seconde ertussen, en alleen als de haard brandt.
 
 ## Wat je nodig hebt
@@ -88,8 +86,11 @@ Is het adres veranderd? Kies bij de integratie **⋮ → Opnieuw configureren**;
 - Een melding als de haard weer gebruikt of bijgevuld kan worden: trigger op `sensor.<naam>_status` die van
   *Afkoelen* naar *Uit* gaat.
 - Een herinnering om bij te vullen: trigger op `binary_sensor.<naam>_brandstof_bijna_op` die aan gaat.
-- Zorgen dat de haard nooit de hele nacht brandt: zet *Automatisch uit na* op bijvoorbeeld 4 uur. Dit werkt
-  zonder automatisering, en ook als Home Assistant tussendoor herstart.
+- Zorgen dat de haard nooit de hele nacht brandt: een automatisering die `switch.<naam>` uitzet als hij
+  bijvoorbeeld 4 uur aan staat (statustrigger met *voor*). Let op: als Home Assistant herstart, begint die
+  wachttijd opnieuw.
+- Zien hoe lang de haard al aan het opwarmen of afkoelen is: het tijdstip *laatst gewijzigd* van
+  `sensor.<naam>_status`, te zien in het venster en de geschiedenis van die entiteit.
 - De haard uit als iedereen weg is: een automatisering op je aanwezigheidsdetectie die `switch.<naam>` uitzet.
 
 ## Hoe vaak wordt de status bijgewerkt?
@@ -113,8 +114,8 @@ of met de officiële app doet, zie je dus binnen een paar seconden terug.
 - Voeg bij een melding de diagnostiek toe: op de apparaatpagina **⋮ → Diagnostiek downloaden**.
 
 ## Verwijderen
-1. **Instellingen → Apparaten en diensten → Wild Flame → ⋮ → Verwijderen.** Ook de opgeslagen
-   automatisch-uit-instelling wordt dan verwijderd.
+1. **Instellingen → Apparaten en diensten → Wild Flame → ⋮ → Verwijderen.** Ook het opgeslagen tijdstip
+   *laatst aangezet* wordt dan verwijderd.
 2. Via HACS geïnstalleerd? Verwijder **Wild Flame** dan ook in HACS en herstart Home Assistant.
 
 Het protocol staat beschreven in [PROTOCOL.md](PROTOCOL.md) (Engels).

@@ -23,7 +23,6 @@ FLAME = "number.haard_vlamhoogte"
 STATUS = "sensor.haard_status"
 CHILD_LOCK = "lock.haard_kinderslot"
 ON_SINCE = "sensor.haard_laatst_aangezet"
-AUTO_OFF = "number.haard_automatisch_uit_na"
 FUEL_LOW = "binary_sensor.haard_brandstof_bijna_op"
 
 
@@ -57,7 +56,6 @@ async def test_entities_created(hass: HomeAssistant, entry, burner) -> None:
     assert hass.states.get(CHILD_LOCK).state == "unlocked"
     assert hass.states.get(FLAME).state == "unavailable"  # only adjustable while burning
     assert hass.states.get(ON_SINCE).state == "unknown"
-    assert hass.states.get(AUTO_OFF).state == "0.0"
     assert hass.states.get(FUEL_LOW).state == "off"
 
 
@@ -66,8 +64,6 @@ async def test_turn_on_and_off(hass: HomeAssistant, entry, burner) -> None:
     await call(hass, "switch", "turn_on", SWITCH)
     assert burner.commands == [CODE_POWER_TOGGLE]
     assert hass.states.get(STATUS).state == "warming_up"
-    warming_since = hass.states.get(STATUS).attributes["since"]
-    assert warming_since is not None
 
     # Already on: turning on again must NOT send another toggle (that would switch it off).
     await call(hass, "switch", "turn_on", SWITCH)
@@ -77,7 +73,6 @@ async def test_turn_on_and_off(hass: HomeAssistant, entry, burner) -> None:
     await entry.runtime_data.async_refresh()
     await hass.async_block_till_done()
     assert hass.states.get(STATUS).state == "burning"
-    assert hass.states.get(STATUS).attributes["since"] > warming_since
     await call(hass, "switch", "turn_off", SWITCH)
     assert burner.commands == [CODE_POWER_TOGGLE, CODE_POWER_TOGGLE]
     assert hass.states.get(STATUS).state == "cooling"
@@ -110,14 +105,12 @@ async def test_on_since_restored_after_restart(hass: HomeAssistant, entry, burne
         "version": 1,
         "key": f"{DOMAIN}.{entry.entry_id}",
         "data": {
-            "auto_off_hours": 3,
             "powered_since": on_since.isoformat(),
             "last_seen": (dt_util.utcnow() - timedelta(minutes=1)).isoformat(),
         },
     }
     await setup(hass, entry)
     assert dt_util.parse_datetime(hass.states.get(ON_SINCE).state) == on_since.replace(microsecond=0)
-    assert hass.states.get(AUTO_OFF).state == "3.0"
 
 
 async def test_on_since_not_restored_after_long_gap(hass: HomeAssistant, entry, burner, hass_storage) -> None:
@@ -126,7 +119,7 @@ async def test_on_since_not_restored_after_long_gap(hass: HomeAssistant, entry, 
     hass_storage[f"{DOMAIN}.{entry.entry_id}"] = {
         "version": 1,
         "key": f"{DOMAIN}.{entry.entry_id}",
-        "data": {"auto_off_hours": 0, "powered_since": old.isoformat(), "last_seen": old.isoformat()},
+        "data": {"powered_since": old.isoformat(), "last_seen": old.isoformat()},
     }
     await setup(hass, entry)
     assert dt_util.parse_datetime(hass.states.get(ON_SINCE).state) > old + timedelta(days=1)
@@ -137,39 +130,12 @@ async def test_last_switched_on_restored_while_off(hass: HomeAssistant, entry, b
     hass_storage[f"{DOMAIN}.{entry.entry_id}"] = {
         "version": 1,
         "key": f"{DOMAIN}.{entry.entry_id}",
-        "data": {"auto_off_hours": 0, "powered_since": None, "last_seen": None, "last_switched_on": last_on.isoformat()},
+        "data": {"powered_since": None, "last_seen": None, "last_switched_on": last_on.isoformat()},
     }
     await setup(hass, entry)
     assert dt_util.parse_datetime(hass.states.get(ON_SINCE).state) == last_on.replace(microsecond=0)
 
 
-async def test_auto_off(hass: HomeAssistant, entry, burner) -> None:
-    burner.powered, burner.phase, burner.flame = 1, 0, 5
-    await setup(hass, entry)
-    await call(hass, "number", "set_value", AUTO_OFF, value=2)
-    assert burner.commands == []  # just switched on
-
-    coordinator = entry.runtime_data
-    coordinator.powered_since = dt_util.utcnow() - timedelta(hours=2, minutes=1)
-    await coordinator.async_refresh()
-    await hass.async_block_till_done()
-    assert burner.commands == [CODE_POWER_TOGGLE]
-    assert hass.states.get(SWITCH).state == "off"
-
-    # Off and cooling: nothing more is sent.
-    await coordinator.async_refresh()
-    await hass.async_block_till_done()
-    assert burner.commands == [CODE_POWER_TOGGLE]
-
-
-async def test_auto_off_disabled(hass: HomeAssistant, entry, burner) -> None:
-    burner.powered, burner.phase, burner.flame = 1, 0, 5
-    await setup(hass, entry)
-    coordinator = entry.runtime_data
-    coordinator.powered_since = dt_util.utcnow() - timedelta(hours=20)
-    await coordinator.async_refresh()
-    await hass.async_block_till_done()
-    assert burner.commands == []
 
 
 async def test_child_lock(hass: HomeAssistant, entry, burner) -> None:
@@ -196,14 +162,15 @@ async def test_child_lock_guard_blocks_double_toggle(hass: HomeAssistant, entry,
     assert burner.commands == [CODE_CHILD_LOCK_TOGGLE]
 
 
-async def test_read_only_child_lock_removed(hass: HomeAssistant, entry, burner) -> None:
+async def test_old_entities_removed(hass: HomeAssistant, entry, burner) -> None:
     entry.add_to_hass(hass)
     registry = er.async_get(hass)
-    old = registry.async_get_or_create(
-        "binary_sensor", DOMAIN, f"{entry.entry_id}_child_lock", config_entry=entry
-    )
+    old = [
+        registry.async_get_or_create(platform, DOMAIN, f"{entry.entry_id}_{key}", config_entry=entry)
+        for platform, key in (("binary_sensor", "child_lock"), ("number", "auto_off"))
+    ]
     await setup(hass, entry)
-    assert registry.async_get(old.entity_id) is None
+    assert all(registry.async_get(entity.entity_id) is None for entity in old)
 
 
 async def test_fuel_low(hass: HomeAssistant, entry, burner) -> None:
@@ -335,24 +302,6 @@ async def test_power_guard_expires(hass: HomeAssistant, entry, burner) -> None:
     assert burner.commands == [CODE_POWER_TOGGLE] * 2
 
 
-async def test_auto_off_failure_is_retried_later(hass: HomeAssistant, entry, burner, caplog) -> None:
-    burner.powered, burner.phase, burner.flame = 1, 0, 5
-    await setup(hass, entry)
-    await call(hass, "number", "set_value", AUTO_OFF, value=1)
-    coordinator = entry.runtime_data
-    coordinator.powered_since = dt_util.utcnow() - timedelta(hours=2)
-    with patch.object(
-        coordinator.client, "send_command", side_effect=WildflameConnectionError("gone")
-    ) as send:
-        await coordinator.async_refresh()
-        await hass.async_block_till_done()
-        assert "Automatic switch-off failed" in caplog.text
-        # Within the retry interval no new attempt is made.
-        await coordinator.async_refresh()
-        await hass.async_block_till_done()
-    assert send.call_count == 1
-    assert hass.states.get(SWITCH).state == "on"
-
 
 async def test_flame_refused_with_child_lock(hass: HomeAssistant, entry, burner) -> None:
     burner.powered, burner.phase, burner.flame, burner.child_lock = 1, 0, 5, 1
@@ -386,8 +335,7 @@ async def test_command_failed(hass: HomeAssistant, entry, burner) -> None:
 
 async def test_unload_and_remove(hass: HomeAssistant, entry, burner, hass_storage) -> None:
     await setup(hass, entry)
-    await call(hass, "number", "set_value", AUTO_OFF, value=1)
-    await hass.async_block_till_done()
+    await call(hass, "switch", "turn_on", SWITCH)  # stores when it was switched on
     assert f"{DOMAIN}.{entry.entry_id}" in hass_storage
 
     assert await hass.config_entries.async_unload(entry.entry_id)

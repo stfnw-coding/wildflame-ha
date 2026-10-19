@@ -30,4 +30,3 @@ async def test_diagnostics(
         "state": "burning",
     }
     assert diagnostics["powered_since"] is not None
-    assert diagnostics["auto_off_hours"] == 0

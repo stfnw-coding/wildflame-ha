@@ -48,9 +48,6 @@
     "number": {
       "flame_level": {
         "name": "Flame level"
-      },
-      "auto_off": {
-        "name": "Auto-off after"
       }
     },
     "sensor": {
@@ -62,11 +59,6 @@
           "burning": "Burning",
           "cooling": "Cooling down",
           "unknown_phase": "Unknown phase"
-        },
-        "state_attributes": {
-          "since": {
-            "name": "Since"
-          }
         }
       },
       "fuel_level": {

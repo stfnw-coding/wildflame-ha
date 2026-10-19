@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 import asyncio
-from datetime import datetime, timedelta
+from datetime import datetime
 import logging
 import time
 from typing import Any, override
@@ -28,7 +28,6 @@ from .api import (
     WildflameStatus,
 )
 from .const import (
-    AUTO_OFF_RETRY_SECONDS,
     DOMAIN,
     FLAME_STEP_DELAY_SECONDS,
     POWER_TOGGLE_GUARD_SECONDS,
@@ -117,15 +116,12 @@ class WildflameCoordinator(DataUpdateCoordinator[WildflameStatus]):
         self.powered_since: datetime | None = None
         # Unlike powered_since this is kept after switching off, so it never goes blank.
         self.last_switched_on: datetime | None = None
-        self.auto_off_hours: float = 0
-        self._auto_off_attempt: float | None = None
         self._last_save = 0.0
         self._warned_phases: set[int] = set()
 
     @override
     async def _async_setup(self) -> None:
         stored = await self._store.async_load() or {}
-        self.auto_off_hours = float(stored.get("auto_off_hours", 0))
         self.last_switched_on = dt_util.parse_datetime(
             stored.get("last_switched_on") or stored.get("powered_since") or ""
         )
@@ -144,7 +140,6 @@ class WildflameCoordinator(DataUpdateCoordinator[WildflameStatus]):
         self._power_guard.observe(status.powered)
         self._child_lock_guard.observe(status.child_lock)
         self._track_powered(status)
-        self._check_auto_off(status)
         if status.state is BurnerState.UNKNOWN_PHASE and status.phase not in self._warned_phases:
             self._warned_phases.add(status.phase)
             _LOGGER.warning(
@@ -164,7 +159,6 @@ class WildflameCoordinator(DataUpdateCoordinator[WildflameStatus]):
                 self._save()  # refreshes last_seen
         elif self.powered_since is not None:
             self.powered_since = None
-            self._auto_off_attempt = None
             self._save()
 
     def _save(self) -> None:
@@ -173,40 +167,10 @@ class WildflameCoordinator(DataUpdateCoordinator[WildflameStatus]):
 
     def _storage_data(self) -> dict[str, Any]:
         return {
-            "auto_off_hours": self.auto_off_hours,
             "powered_since": self.powered_since.isoformat() if self.powered_since else None,
             "last_seen": dt_util.utcnow().isoformat() if self.powered_since else None,
             "last_switched_on": self.last_switched_on.isoformat() if self.last_switched_on else None,
         }
-
-    async def async_set_auto_off_hours(self, hours: float) -> None:
-        self.auto_off_hours = hours
-        self._save()
-        if self.data is not None:
-            self._check_auto_off(self.data)
-        self.async_update_listeners()
-
-    def _check_auto_off(self, status: WildflameStatus) -> None:
-        if not (status.powered and self.auto_off_hours and self.powered_since):
-            return
-        if dt_util.utcnow() - self.powered_since < timedelta(hours=self.auto_off_hours):
-            return
-        if (
-            self._auto_off_attempt is not None
-            and time.monotonic() - self._auto_off_attempt < AUTO_OFF_RETRY_SECONDS
-        ):
-            return
-        self._auto_off_attempt = time.monotonic()
-        self.config_entry.async_create_task(
-            self.hass, self._async_auto_off(), f"{DOMAIN} auto off"
-        )
-
-    async def _async_auto_off(self) -> None:
-        _LOGGER.info("Switching the burner off: the %s h auto-off time has passed", self.auto_off_hours)
-        try:
-            await self.async_set_power(False)
-        except HomeAssistantError as err:
-            _LOGGER.warning("Automatic switch-off failed, will retry: %s", err)
 
     async def async_set_power(self, on: bool) -> None:
         async with self._command_lock:

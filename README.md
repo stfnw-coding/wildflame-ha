@@ -16,14 +16,13 @@ Home Assistant. No cloud: Home Assistant talks directly to the burner over the b
 |---|---|
 | `switch.<name>` | Turn the burner on or off |
 | `number.<name>_flame_level` | Flame level 1–10 (unavailable unless the burner is burning) |
-| `sensor.<name>_status` | Off / Warming up / Burning / Cooling down / Unknown phase, with a `since` attribute |
+| `sensor.<name>_status` | Off / Warming up / Burning / Cooling down / Unknown phase |
 | `sensor.<name>_last_switched_on` | When the burner was last switched on (kept after it goes off) |
 | `sensor.<name>_fuel_level` | Fuel level in % (steps of 10%) |
 | `binary_sensor.<name>_fuel_low` | On at 10% fuel or less |
 | `sensor.<name>_room_temperature` | Room temperature in °C |
 | `sensor.<name>_humidity` | Humidity in % |
 | `lock.<name>_child_lock` | Child lock on the burner: lock or unlock it |
-| `number.<name>_auto_off_after` | Switch the burner off after this many hours (0 = never; configuration) |
 | `sensor.<name>_phase_code` | Raw phase code (diagnostic) |
 
 Entity names follow your Home Assistant language (English and Dutch included).
@@ -36,8 +35,6 @@ The integration therefore always reads the current status first and only sends a
   (possibly an error); the code is logged so it can be added;
 - after an on/off or child lock command no second one is sent for 30 seconds, until the burner reports the
   new state (a second toggle would undo the first);
-- the optional auto-off time switches the burner off after it has been on that long, also when no
-  automation is set up;
 - the flame level changes in single steps one second apart, and only while the burner is burning.
 
 ## Requirements
@@ -90,8 +87,11 @@ Did the address change? Use **⋮ → Reconfigure** on the integration entry; th
 - Get notified when the burner can be used or refilled again: trigger on `sensor.<name>_status` changing from
   *Cooling down* to *Off*.
 - Get a reminder to refill: trigger on `binary_sensor.<name>_fuel_low` turning on.
-- Make sure the burner never burns all night: set *Auto-off after* to, for example, 4 hours. This works without
-  any automation and also when Home Assistant restarts in between.
+- Make sure the burner never burns all night: an automation that turns off `switch.<name>` when it has been
+  on for, for example, 4 hours (state trigger with *for*). Note that Home Assistant restarts this timer when it
+  restarts itself.
+- See how long the burner has been warming up or cooling down: the *last changed* time of
+  `sensor.<name>_status`, shown in its dialog and history.
 - Switch the burner off when everybody leaves home: an automation on your presence detection that turns off
   `switch.<name>`.
 
@@ -116,7 +116,7 @@ the burner itself or with the official app therefore show up within a few second
 - When you report a problem, attach the diagnostics: on the device page, **⋮ → Download diagnostics**.
 
 ## Removal
-1. **Settings → Devices & services → Wild Flame → ⋮ → Delete.** This also removes the stored auto-off setting.
+1. **Settings → Devices & services → Wild Flame → ⋮ → Delete.** This also removes the stored *last switched on* time.
 2. Installed with HACS? Remove **Wild Flame** in HACS as well and restart Home Assistant.
 
 ## How it works
