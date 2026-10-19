@@ -18,8 +18,8 @@ Observed on a Smart Fire A6 (80 cm) with the iOS app "Wild Flame" 1.1.0, October
 | `usart1` | Fuel level in tenths (`2` = 20%) |
 | `usart2` | Phase code, matches the status LED: `6` ready (LED off), `10` warming up (green blinking), `0` burning, `1` cooling down (red blinking) |
 | `usart3` | Flame level `1`–`10`; `0` while not burning or still warming up |
-| `usart4` | Humidity, % |
-| `usart5` | Room temperature, °C |
+| `usart4` | Humidity, % (see note) |
+| `usart5` | Room temperature, °C (see note) |
 | `usart6` | Child lock: `0` off, otherwise on |
 | `usart7` | Power: `0` off, otherwise on |
 
@@ -43,5 +43,9 @@ There is no command to set an absolute power state or flame level. Read the stat
 | ~6:40 | Ready to adjust | `usart2=0`, `usart3=5` |
 | later | `82534KL` sent | `usart7=0`, `usart2=1`, `usart3=0` |
 | +~85 min | Cooled down, red LED off | `usart2=6` |
+
+Note on `usart4` and `usart5`: on the tested Smart Fire A6 they always read `45` and `20`, also while burning
+and cooling down, and the official app shows the same fixed values. On this unit they are not real
+measurements. Other units or models may report real values; reports are welcome.
 
 Unknown so far: phase codes for errors or a blocked burner (e.g. room or fuel below 17 °C).

@@ -105,6 +105,8 @@ the burner itself or with the official app therefore show up within a few second
   child lock command is still being processed.
 - The flame level can only be changed while the burner is burning, not while it warms up.
 - The fuel level comes in steps of 10%.
+- On the tested Smart Fire A6, room temperature and humidity always read 20 °C and 45%, also while burning; the
+  official app shows the same values. If yours never change either, disable these two entities.
 - Only the Smart Fire A6 has been tested. Other Smart Fire models probably work the same; please report it.
 
 ## Troubleshooting

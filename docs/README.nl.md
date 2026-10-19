@@ -103,6 +103,9 @@ of met de officiële app doet, zie je dus binnen een paar seconden terug.
   aan/uit- of kinderslot-commando nog wordt verwerkt.
 - De vlamhoogte is alleen regelbaar als de haard brandt, niet tijdens het opwarmen.
 - Het brandstofniveau gaat in stappen van 10%.
+- Op de geteste Smart Fire A6 geven kamertemperatuur en luchtvochtigheid altijd 20 °C en 45%, ook als de haard
+  brandt; de officiële app laat dezelfde waarden zien. Veranderen ze bij jou ook nooit, schakel deze twee
+  entiteiten dan uit.
 - Alleen de Smart Fire A6 is getest. Andere Smart Fire-modellen werken waarschijnlijk hetzelfde; laat het weten.
 
 ## Problemen oplossen
