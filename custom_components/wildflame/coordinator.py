@@ -136,6 +136,8 @@ class WildflameCoordinator(DataUpdateCoordinator[WildflameStatus]):
                     raise _refused("child_lock_active")
                 if status.state is BurnerState.COOLING:
                     raise _refused("cooling_down")
+                if status.state is BurnerState.FUEL_EMPTY:
+                    raise _refused("fuel_empty")
                 if status.state is BurnerState.UNKNOWN_PHASE:
                     raise _refused("unknown_phase", phase=str(status.phase))
             await self._send(CODE_POWER_TOGGLE)

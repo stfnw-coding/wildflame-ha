@@ -31,15 +31,6 @@
     }
   },
   "entity": {
-    "binary_sensor": {
-      "fuel_low": {
-        "name": "Brandstof bijna op",
-        "state": {
-          "on": "Bijna leeg",
-          "off": "Voldoende"
-        }
-      }
-    },
     "lock": {
       "child_lock": {
         "name": "Kinderslot"
@@ -58,6 +49,7 @@
           "warming_up": "Opwarmen",
           "burning": "Brandt",
           "cooling": "Afkoelen",
+          "fuel_empty": "Brandstof leeg",
           "unknown_phase": "Onbekende fase"
         }
       },
@@ -87,6 +79,9 @@
     },
     "cooling_down": {
       "message": "De haard koelt nog af (rood lampje) en kan pas weer aan als dat klaar is."
+    },
+    "fuel_empty": {
+      "message": "De brandstof van de haard is op. Vul hem bij voordat je hem aanzet."
     },
     "unknown_phase": {
       "message": "De haard meldt een onbekende fase (code {phase}). Aanzetten is voor de veiligheid geblokkeerd; controleer de haard."

@@ -20,7 +20,6 @@ SWITCH = "switch.haard"
 FLAME = "number.haard_vlamhoogte"
 STATUS = "sensor.haard_status"
 CHILD_LOCK = "lock.haard_kinderslot"
-FUEL_LOW = "binary_sensor.haard_brandstof_bijna_op"
 
 
 @pytest.fixture(autouse=True)
@@ -52,7 +51,6 @@ async def test_entities_created(hass: HomeAssistant, entry, burner) -> None:
     assert hass.states.get("sensor.haard_luchtvochtigheid").state == "45.0"
     assert hass.states.get(CHILD_LOCK).state == "unlocked"
     assert hass.states.get(FLAME).state == "unavailable"  # only adjustable while burning
-    assert hass.states.get(FUEL_LOW).state == "off"
 
 
 async def test_turn_on_and_off(hass: HomeAssistant, entry, burner) -> None:
@@ -115,29 +113,19 @@ async def test_old_entities_removed(hass: HomeAssistant, entry, burner) -> None:
             ("binary_sensor", "child_lock"),
             ("number", "auto_off"),
             ("sensor", "on_since"),
+            ("binary_sensor", "fuel_low"),
         )
     ]
     await setup(hass, entry)
     assert all(registry.async_get(entity.entity_id) is None for entity in old)
 
 
-async def test_fuel_low(hass: HomeAssistant, entry, burner) -> None:
-    burner.fuel = 1
-    await setup(hass, entry)
-    assert hass.states.get(FUEL_LOW).state == "on"
-    # Not a "problem" sensor: that would show as OK/Problem instead of Bijna leeg/Voldoende.
-    assert "device_class" not in hass.states.get(FUEL_LOW).attributes
-    burner.fuel = 2
-    await entry.runtime_data.async_refresh()
-    await hass.async_block_till_done()
-    assert hass.states.get(FUEL_LOW).state == "off"
-
 
 async def test_unknown_phase_blocks_start(hass: HomeAssistant, entry, burner, caplog) -> None:
-    burner.phase = 7
+    burner.phase = 3
     await setup(hass, entry)
     assert hass.states.get(STATUS).state == "unknown_phase"
-    assert "phase code 7" in caplog.text
+    assert "phase code 3" in caplog.text
     with pytest.raises(HomeAssistantError) as err:
         await call(hass, "switch", "turn_on", SWITCH)
     assert err.value.translation_key == "unknown_phase"
@@ -153,6 +141,18 @@ async def test_refuse_start_while_cooling(hass: HomeAssistant, entry, burner) ->
     assert err.value.translation_key == "cooling_down"
     # Logs get the English text; the frontend shows the message in the user's language.
     assert "still cooling down" in str(err.value)
+    assert burner.commands == []
+
+
+async def test_refuse_start_when_fuel_empty(hass: HomeAssistant, entry, burner, caplog) -> None:
+    burner.fuel, burner.phase = 0, 7  # as reported after the tank ran empty
+    await setup(hass, entry)
+    assert hass.states.get(STATUS).state == "fuel_empty"
+    assert "phase code" not in caplog.text
+    with pytest.raises(ServiceValidationError) as err:
+        await call(hass, "switch", "turn_on", SWITCH)
+    assert err.value.translation_key == "fuel_empty"
+    assert "out of fuel" in str(err.value)
     assert burner.commands == []
 
 

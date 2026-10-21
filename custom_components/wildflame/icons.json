@@ -1,13 +1,5 @@
 {
   "entity": {
-    "binary_sensor": {
-      "fuel_low": {
-        "default": "mdi:fuel",
-        "state": {
-          "on": "mdi:gauge-empty"
-        }
-      }
-    },
     "number": {
       "flame_level": {
         "default": "mdi:fire"
@@ -25,6 +17,7 @@
         "state": {
           "burning": "mdi:fireplace",
           "cooling": "mdi:snowflake-thermometer",
+          "fuel_empty": "mdi:gauge-empty",
           "unknown_phase": "mdi:alert-circle-outline",
           "warming_up": "mdi:fire-circle"
         }

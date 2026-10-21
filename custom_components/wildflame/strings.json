@@ -31,15 +31,6 @@
     }
   },
   "entity": {
-    "binary_sensor": {
-      "fuel_low": {
-        "name": "Fuel low",
-        "state": {
-          "on": "Low",
-          "off": "Sufficient"
-        }
-      }
-    },
     "lock": {
       "child_lock": {
         "name": "Child lock"
@@ -58,6 +49,7 @@
           "warming_up": "Warming up",
           "burning": "Burning",
           "cooling": "Cooling down",
+          "fuel_empty": "Fuel empty",
           "unknown_phase": "Unknown phase"
         }
       },
@@ -87,6 +79,9 @@
     },
     "cooling_down": {
       "message": "The burner is still cooling down (red light) and can only be switched on once that is done."
+    },
+    "fuel_empty": {
+      "message": "The burner is out of fuel. Refill it before switching it on."
     },
     "unknown_phase": {
       "message": "The burner reports an unknown phase (code {phase}). Switching on is blocked for safety; check the burner."

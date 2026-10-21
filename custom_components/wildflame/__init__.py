@@ -13,7 +13,6 @@ from .const import DOMAIN
 from .coordinator import WildflameConfigEntry, WildflameCoordinator
 
 PLATFORMS: list[Platform] = [
-    Platform.BINARY_SENSOR,
     Platform.LOCK,
     Platform.NUMBER,
     Platform.SENSOR,
@@ -47,6 +46,8 @@ _OLD_ENTITIES: tuple[tuple[Platform, str], ...] = (
     # "Last switched on" was removed in 0.5.0: it was not burner data but derived from the switch,
     # whose history Home Assistant already keeps.
     (Platform.SENSOR, "on_since"),
+    # "Fuel low" was removed in 0.6.0: an automation on the fuel level does the same.
+    (Platform.BINARY_SENSOR, "fuel_low"),
 )
 
 

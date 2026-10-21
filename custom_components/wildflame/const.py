@@ -14,6 +14,3 @@ POWER_TOGGLE_GUARD_SECONDS = 30
 
 # Pause between single flame steps so the burner registers each one.
 FLAME_STEP_DELAY_SECONDS = 1.0
-
-# Fuel level (%) at or below which the "fuel low" problem sensor turns on.
-FUEL_LOW_PERCENT = 10

@@ -16,9 +16,8 @@ Home Assistant. No cloud: Home Assistant talks directly to the burner over the b
 |---|---|
 | `switch.<name>` | Turn the burner on or off |
 | `number.<name>_flame_level` | Flame level 1–10 (unavailable unless the burner is burning) |
-| `sensor.<name>_status` | Off / Warming up / Burning / Cooling down / Unknown phase |
+| `sensor.<name>_status` | Off / Warming up / Burning / Cooling down / Fuel empty / Unknown phase |
 | `sensor.<name>_fuel_level` | Fuel level in % (steps of 10%) |
-| `binary_sensor.<name>_fuel_low` | On at 10% fuel or less |
 | `sensor.<name>_room_temperature` | Room temperature in °C |
 | `sensor.<name>_humidity` | Humidity in % |
 | `lock.<name>_child_lock` | Child lock on the burner: lock or unlock it |
@@ -29,7 +28,7 @@ Entity names follow your Home Assistant language (English and Dutch included).
 ### Built-in safety
 The burner only understands *toggle* and *step* commands: the same command switches it on **and** off.
 The integration therefore always reads the current status first and only sends a command when needed:
-- switching on is refused while the burner is cooling down or the child lock is active;
+- switching on is refused while the burner is cooling down, out of fuel or the child lock is active;
 - switching on is also refused when the burner reports a phase code the integration does not know
   (possibly an error); the code is logged so it can be added;
 - after an on/off or child lock command no second one is sent for 30 seconds, until the burner reports the
@@ -81,11 +80,12 @@ Did the address change? Use **⋮ → Reconfigure** on the integration entry; th
 | Warming up | green, blinking | Warming up | About 7 minutes. Flames appear before the end, but the flame level cannot be changed yet |
 | Burning | – | Burning | Starts at level 5, adjustable 1–10 |
 | Cooling down | red, blinking | Cooling down | Can take over an hour. Cannot be switched on or refilled |
+| Out of fuel | not recorded yet | Fuel empty | After the tank runs empty: the burner switches itself off, cools down and then reports this. Refill before switching on |
 
 ## Examples
 - Get notified when the burner can be used or refilled again: trigger on `sensor.<name>_status` changing from
-  *Cooling down* to *Off*.
-- Get a reminder to refill: trigger on `binary_sensor.<name>_fuel_low` turning on.
+  *Cooling down* to *Off* or *Fuel empty*.
+- Get a reminder to refill: numeric state trigger on `sensor.<name>_fuel_level` going below 20 (so at 10% or less).
 - Make sure the burner never burns all night: an automation that turns off `switch.<name>` when it has been
   on for, for example, 4 hours (state trigger with *for*). Note that Home Assistant restarts this timer when it
   restarts itself.
