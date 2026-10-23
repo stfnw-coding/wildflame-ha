@@ -5,29 +5,34 @@
         "title": "Wild Flame burner",
         "description": "The burner is only reachable on its own Wi-Fi (WILDFLAME…). Connect Home Assistant to that network first.",
         "data": {
-          "host": "IP address"
+          "host": "IP address",
+          "password": "Wi-Fi password (optional)"
         },
         "data_description": {
-          "host": "Address of the burner on its own Wi-Fi network. This is 192.168.4.1 unless you changed it."
+          "host": "Address of the burner on its own Wi-Fi network. This is 192.168.4.1 unless you changed it.",
+          "password": "Password of the burner's own Wi-Fi. With it, Home Assistant OS reconnects to that Wi-Fi by itself when the connection drops and is not restored. Leave it empty if you don't want that."
         }
       },
       "reconfigure": {
-        "title": "Change the burner's address",
-        "description": "Enter the new IP address of the burner. Home Assistant checks that it can reach the burner there.",
+        "title": "Change the burner's settings",
+        "description": "Change the burner's IP address or Wi-Fi password. Home Assistant checks that it can reach the burner.",
         "data": {
-          "host": "IP address"
+          "host": "IP address",
+          "password": "Wi-Fi password (optional)"
         },
         "data_description": {
-          "host": "Address of the burner on its own Wi-Fi network. This is 192.168.4.1 unless you changed it."
+          "host": "Address of the burner on its own Wi-Fi network. This is 192.168.4.1 unless you changed it.",
+          "password": "Password of the burner's own Wi-Fi. With it, Home Assistant OS reconnects to that Wi-Fi by itself when the connection drops and is not restored. Leave it empty if you don't want that."
         }
       }
     },
     "error": {
-      "cannot_connect": "Cannot reach the burner. Is Home Assistant connected to the burner's Wi-Fi?"
+      "cannot_connect": "Cannot reach the burner. Is Home Assistant connected to the burner's Wi-Fi?",
+      "wifi_not_found": "Home Assistant cannot find a Wi-Fi connection to the burner. Reconnecting needs Home Assistant OS connected to the burner's Wi-Fi; otherwise leave the password empty."
     },
     "abort": {
       "already_configured": "This burner is already configured.",
-      "reconfigure_successful": "The burner's address has been updated."
+      "reconfigure_successful": "The burner's settings have been updated."
     }
   },
   "entity": {

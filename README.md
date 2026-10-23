@@ -67,11 +67,13 @@ Copy `custom_components/wildflame` to `/config/custom_components/wildflame` and 
 | Field | Description |
 |---|---|
 | IP address | Address of the burner on its own Wi-Fi. Keep it at `192.168.4.1` unless you changed it. |
+| Wi-Fi password (optional) | Password of the burner's Wi-Fi. Home Assistant OS only: lets the integration reconnect Home Assistant to that Wi-Fi when the connection drops and is not restored (see Troubleshooting). |
 
 The integration checks that the burner is reachable before it is added. The device is called *Wild Flame*;
 rename it (for example to "Fireplace") on the device page and let Home Assistant rename the entity IDs with it.
 
-Did the address change? Use **⋮ → Reconfigure** on the integration entry; there is no need to remove it.
+Did the address change, or do you want to add or remove the Wi-Fi password? Use **⋮ → Reconfigure** on the
+integration entry; there is no need to remove it.
 
 ## What to expect
 | Phase | LED | Status | Notes |
@@ -116,7 +118,12 @@ the burner itself or with the official app therefore show up within a few second
 - **Worked fine, then suddenly unavailable and it stays that way**: if the burner's Wi-Fi drops briefly,
   Home Assistant OS may treat the failed reconnect as a wrong password and stop trying. WLAN0 then has no
   `192.168.4.x` address. Open WLAN0 under Settings → System → Network, enter the burner's Wi-Fi password again
-  and save; the integration reconnects by itself within a minute.
+  and save; the integration reconnects by itself within a few minutes.
+  With the Wi-Fi password filled in (Setup), the integration does this for you: while the burner is
+  unreachable it checks every 2 minutes, and when the Wi-Fi interface is down but the burner's network is on
+  the air, it applies the Wi-Fi settings again (WPA-PSK, IPv4 automatic). The log then shows
+  "Home Assistant lost its Wi-Fi connection to the burner". If that does not help, it waits longer each time,
+  up to about an hour.
 - **"Unknown phase"**: the burner reports a phase code the integration does not know yet, possibly an error.
   Switching on is blocked. Please open an issue with the code and what the burner shows.
 - When you report a problem, attach the diagnostics: on the device page, **⋮ → Download diagnostics**.

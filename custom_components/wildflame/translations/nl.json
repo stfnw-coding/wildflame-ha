@@ -5,29 +5,34 @@
         "title": "Wild Flame-haard",
         "description": "De haard is alleen bereikbaar via zijn eigen wifi (WILDFLAME…). Verbind Home Assistant eerst met dat netwerk.",
         "data": {
-          "host": "IP-adres"
+          "host": "IP-adres",
+          "password": "Wifi-wachtwoord (optioneel)"
         },
         "data_description": {
-          "host": "Adres van de haard op zijn eigen wifi-netwerk. Dit is 192.168.4.1, tenzij je het hebt veranderd."
+          "host": "Adres van de haard op zijn eigen wifi-netwerk. Dit is 192.168.4.1, tenzij je het hebt veranderd.",
+          "password": "Wachtwoord van het eigen wifi van de haard. Hiermee verbindt Home Assistant OS zelf opnieuw met dat wifi als de verbinding wegvalt en niet terugkomt. Laat het leeg als je dat niet wilt."
         }
       },
       "reconfigure": {
-        "title": "Adres van de haard wijzigen",
-        "description": "Vul het nieuwe IP-adres van de haard in. Home Assistant controleert of de haard daar bereikbaar is.",
+        "title": "Instellingen van de haard wijzigen",
+        "description": "Wijzig het IP-adres of het wifi-wachtwoord van de haard. Home Assistant controleert of de haard bereikbaar is.",
         "data": {
-          "host": "IP-adres"
+          "host": "IP-adres",
+          "password": "Wifi-wachtwoord (optioneel)"
         },
         "data_description": {
-          "host": "Adres van de haard op zijn eigen wifi-netwerk. Dit is 192.168.4.1, tenzij je het hebt veranderd."
+          "host": "Adres van de haard op zijn eigen wifi-netwerk. Dit is 192.168.4.1, tenzij je het hebt veranderd.",
+          "password": "Wachtwoord van het eigen wifi van de haard. Hiermee verbindt Home Assistant OS zelf opnieuw met dat wifi als de verbinding wegvalt en niet terugkomt. Laat het leeg als je dat niet wilt."
         }
       }
     },
     "error": {
-      "cannot_connect": "Kan de haard niet bereiken. Is Home Assistant verbonden met de wifi van de haard?"
+      "cannot_connect": "Kan de haard niet bereiken. Is Home Assistant verbonden met de wifi van de haard?",
+      "wifi_not_found": "Home Assistant vindt geen wifi-verbinding met de haard. Opnieuw verbinden werkt alleen met Home Assistant OS dat met het wifi van de haard verbonden is; laat het wachtwoord anders leeg."
     },
     "abort": {
       "already_configured": "Deze haard is al toegevoegd.",
-      "reconfigure_successful": "Het adres van de haard is bijgewerkt."
+      "reconfigure_successful": "De instellingen van de haard zijn bijgewerkt."
     }
   },
   "entity": {

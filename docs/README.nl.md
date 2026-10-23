@@ -66,11 +66,13 @@ Kopieer `custom_components/wildflame` naar `/config/custom_components/wildflame`
 | Veld | Uitleg |
 |---|---|
 | IP-adres | Adres van de haard op zijn eigen wifi. Laat het op `192.168.4.1` staan, tenzij je het hebt veranderd. |
+| Wifi-wachtwoord (optioneel) | Wachtwoord van het wifi van de haard. Alleen voor Home Assistant OS: hiermee verbindt de integratie Home Assistant opnieuw met dat wifi als de verbinding wegvalt en niet terugkomt (zie Problemen oplossen). |
 
 De integratie controleert direct of de haard bereikbaar is. Het apparaat heet *Wild Flame*; geef het op de
 apparaatpagina een eigen naam (bijvoorbeeld "Haard") en laat Home Assistant de entiteit-ID's meeveranderen.
 
-Is het adres veranderd? Kies bij de integratie **⋮ → Opnieuw configureren**; verwijderen is niet nodig.
+Is het adres veranderd, of wil je het wifi-wachtwoord toevoegen of weghalen? Kies bij de integratie
+**⋮ → Opnieuw configureren**; verwijderen is niet nodig.
 
 ## Wat je kunt verwachten
 | Fase | Lampje | Status | Opmerking |
@@ -115,7 +117,12 @@ of met de officiële app doet, zie je dus binnen een paar seconden terug.
 - **Werkte goed, ineens niet beschikbaar en dat blijft zo**: valt het wifi van de haard even weg, dan kan Home
   Assistant OS de mislukte herverbinding als een fout wachtwoord zien en stoppen met proberen. WLAN0 heeft dan
   geen `192.168.4.x`-adres. Open WLAN0 onder Instellingen → Systeem → Netwerk, vul het wifi-wachtwoord van de
-  haard opnieuw in en sla op; de integratie maakt binnen een minuut vanzelf weer verbinding.
+  haard opnieuw in en sla op; de integratie maakt binnen een paar minuten vanzelf weer verbinding.
+  Heb je het wifi-wachtwoord ingevuld (Toevoegen), dan doet de integratie dit zelf: zolang de haard
+  onbereikbaar is, kijkt hij elke 2 minuten, en als de wifi-interface niet verbonden is maar het wifi van de
+  haard wel in de lucht is, past hij de wifi-instellingen opnieuw toe (WPA-PSK, IPv4 automatisch). In het
+  logboek staat dan "Home Assistant lost its Wi-Fi connection to the burner". Helpt dat niet, dan wacht hij
+  elke keer langer, tot ongeveer een uur.
 - **"Onbekende fase"**: de haard meldt een fasecode die de integratie nog niet kent, mogelijk een storing.
   Aanzetten is dan geblokkeerd. Meld de code en wat de haard laat zien in een issue.
 - Voeg bij een melding de diagnostiek toe: op de apparaatpagina **⋮ → Diagnostiek downloaden**.

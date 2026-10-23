@@ -14,3 +14,10 @@ POWER_TOGGLE_GUARD_SECONDS = 30
 
 # Pause between single flame steps so the burner registers each one.
 FLAME_STEP_DELAY_SECONDS = 1.0
+
+# Optional: the burner's Wi-Fi password, and the interface and network found with it, for Wi-Fi recovery.
+CONF_WIFI_INTERFACE = "wifi_interface"
+CONF_WIFI_SSID = "wifi_ssid"
+
+# While the burner is unreachable, check this often whether Home Assistant's Wi-Fi connection gave up.
+WIFI_CHECK_INTERVAL_SECONDS = 120

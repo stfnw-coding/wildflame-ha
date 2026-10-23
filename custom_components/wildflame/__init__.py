@@ -2,15 +2,16 @@
 
 from __future__ import annotations
 
-from homeassistant.const import CONF_HOST, Platform
+from homeassistant.const import CONF_HOST, CONF_PASSWORD, Platform
 from homeassistant.core import HomeAssistant
 from homeassistant.helpers import entity_registry as er
 from homeassistant.helpers.aiohttp_client import async_create_clientsession
 from homeassistant.helpers.storage import Store
 
 from .api import WildflameClient
-from .const import DOMAIN
+from .const import CONF_WIFI_INTERFACE, CONF_WIFI_SSID, DOMAIN
 from .coordinator import WildflameConfigEntry, WildflameCoordinator
+from .wifi import WifiLink, WifiRecovery
 
 PLATFORMS: list[Platform] = [
     Platform.LOCK,
@@ -24,7 +25,11 @@ async def async_setup_entry(hass: HomeAssistant, entry: WildflameConfigEntry) ->
     # Own session: the burner closes every connection, so pooled keep-alive connections are useless.
     session = async_create_clientsession(hass, auto_cleanup=True)
     client = WildflameClient(session, entry.data[CONF_HOST])
-    coordinator = WildflameCoordinator(hass, entry, client)
+    wifi_recovery = None
+    if password := entry.data.get(CONF_PASSWORD):
+        link = WifiLink(entry.data[CONF_WIFI_INTERFACE], entry.data[CONF_WIFI_SSID])
+        wifi_recovery = WifiRecovery(hass, entry, link, password)
+    coordinator = WildflameCoordinator(hass, entry, client, wifi_recovery)
     _remove_old_entities(hass, entry)
     await _remove_old_storage(hass, entry)
     await coordinator.async_config_entry_first_refresh()
