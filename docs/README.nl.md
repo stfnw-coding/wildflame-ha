@@ -112,6 +112,10 @@ of met de officiële app doet, zie je dus binnen een paar seconden terug.
 - **"Kan de haard niet bereiken" bij het toevoegen, of alle entiteiten niet beschikbaar**: controleer of Home
   Assistant nog met het `WILDFLAME…`-wifi verbonden is (Instellingen → Systeem → Netwerk). De haard laat maar
   een paar wifi-apparaten toe; een telefoon of tablet ervan loskoppelen kan helpen.
+- **Werkte goed, ineens niet beschikbaar en dat blijft zo**: valt het wifi van de haard even weg, dan kan Home
+  Assistant OS de mislukte herverbinding als een fout wachtwoord zien en stoppen met proberen. WLAN0 heeft dan
+  geen `192.168.4.x`-adres. Open WLAN0 onder Instellingen → Systeem → Netwerk, vul het wifi-wachtwoord van de
+  haard opnieuw in en sla op; de integratie maakt binnen een minuut vanzelf weer verbinding.
 - **"Onbekende fase"**: de haard meldt een fasecode die de integratie nog niet kent, mogelijk een storing.
   Aanzetten is dan geblokkeerd. Meld de code en wat de haard laat zien in een issue.
 - Voeg bij een melding de diagnostiek toe: op de apparaatpagina **⋮ → Diagnostiek downloaden**.

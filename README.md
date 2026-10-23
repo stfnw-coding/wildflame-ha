@@ -113,6 +113,10 @@ the burner itself or with the official app therefore show up within a few second
 - **"Cannot reach the burner" during setup, or all entities unavailable**: check that Home Assistant is still
   connected to the `WILDFLAME…` Wi-Fi (Settings → System → Network). The burner accepts only a few Wi-Fi
   clients; disconnecting a phone or tablet from it can help.
+- **Worked fine, then suddenly unavailable and it stays that way**: if the burner's Wi-Fi drops briefly,
+  Home Assistant OS may treat the failed reconnect as a wrong password and stop trying. WLAN0 then has no
+  `192.168.4.x` address. Open WLAN0 under Settings → System → Network, enter the burner's Wi-Fi password again
+  and save; the integration reconnects by itself within a minute.
 - **"Unknown phase"**: the burner reports a phase code the integration does not know yet, possibly an error.
   Switching on is blocked. Please open an issue with the code and what the burner shows.
 - When you report a problem, attach the diagnostics: on the device page, **⋮ → Download diagnostics**.
