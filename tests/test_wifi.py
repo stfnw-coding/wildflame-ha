@@ -12,9 +12,10 @@ from homeassistant.components.hassio.const import DATA_COMPONENT
 from homeassistant.components.hassio.handler import HassioAPIError
 from freezegun.api import FrozenDateTimeFactory
 from homeassistant.config_entries import SOURCE_USER, ConfigEntryDisabler, ConfigEntryState
-from homeassistant.const import CONF_HOST, CONF_PASSWORD
+from homeassistant.const import CONF_HOST, CONF_PASSWORD, EntityCategory
 from homeassistant.core import HomeAssistant
 from homeassistant.data_entry_flow import FlowResultType
+from homeassistant.helpers import entity_registry as er
 from pytest_homeassistant_custom_component.common import MockConfigEntry, async_fire_time_changed
 from pytest_homeassistant_custom_component.components.diagnostics import (
     get_diagnostics_for_config_entry,
@@ -31,17 +32,19 @@ from custom_components.wildflame.wifi import WifiLink, async_find_wifi_link, asy
 
 from .test_integration import setup
 
+WIFI_SIGNAL = "sensor.haard_wifi_signaal"
+
 SSID = "WILDFLAME800"
 PASSWORD = "burner-secret"
 
 
-def interface(name, kind, address, ssid=None, connected=True):
+def interface(name, kind, address, ssid=None, connected=True, signal=72):
     return SimpleNamespace(
         interface=name,
         type=kind,
         connected=connected,
         ipv4=SimpleNamespace(address=[ip_interface(address)]) if address else None,
-        wifi=SimpleNamespace(ssid=ssid) if ssid else None,
+        wifi=SimpleNamespace(ssid=ssid, signal=signal) if ssid else None,
     )
 
 
@@ -276,6 +279,7 @@ async def test_no_watchdog_without_password(hass: HomeAssistant, supervisor, ent
 async def test_stops_when_entry_removed(hass: HomeAssistant, supervisor, burner, tick) -> None:
     entry = wifi_entry(burner.host)
     await setup(hass, entry)
+    supervisor.client.network.interface_info.reset_mock()
     await hass.config_entries.async_remove(entry.entry_id)
     await tick(2)
     supervisor.client.network.interface_info.assert_not_awaited()
@@ -331,6 +335,7 @@ async def test_user_flow_password_without_wifi(hass: HomeAssistant, burner) -> N
 async def test_reconfigure_removes_password(hass: HomeAssistant, supervisor, burner, tick) -> None:
     entry = wifi_entry(burner.host)
     await setup(hass, entry)
+    supervisor.client.network.interface_info.reset_mock()
     result = await entry.start_reconfigure_flow(hass)
     result = await hass.config_entries.flow.async_configure(result["flow_id"], {CONF_HOST: burner.host})
     await hass.async_block_till_done()
@@ -354,3 +359,51 @@ async def test_diagnostics_redacts_password(
         CONF_WIFI_INTERFACE: "wlan0",
         CONF_WIFI_SSID: SSID,
     }
+    assert diagnostics["wifi_signal"] == {"interface": "wlan0", "signal": 72}
+
+
+async def test_wifi_signal_sensor(hass: HomeAssistant, supervisor, burner, tick) -> None:
+    await setup(hass, wifi_entry(burner.host))
+    state = hass.states.get(WIFI_SIGNAL)
+    assert state.state == "72"
+    assert state.attributes["unit_of_measurement"] == "%"
+    assert er.async_get(hass).async_get(WIFI_SIGNAL).entity_category is EntityCategory.DIAGNOSTIC
+
+    supervisor.client.network.interface_info.return_value = interface(
+        "wlan0", InterfaceType.WIRELESS, "192.168.4.10/24", SSID, signal=40
+    )
+    await tick()
+    assert hass.states.get(WIFI_SIGNAL).state == "40"
+    # Not connected: no signal to show.
+    lose_wifi(supervisor)
+    await tick()
+    assert hass.states.get(WIFI_SIGNAL).state == "unknown"
+    # No answer from the Supervisor.
+    supervisor.client.network.interface_info.side_effect = SupervisorError("busy")
+    await tick()
+    assert hass.states.get(WIFI_SIGNAL).state == "unavailable"
+
+
+async def test_wifi_signal_without_password(hass: HomeAssistant, supervisor, entry) -> None:
+    """Only the watchdog needs the password; the signal is found through the burner's address."""
+    with patch(
+        "custom_components.wildflame.async_find_wifi_link", return_value=WifiLink("wlan0", SSID)
+    ) as find:
+        await setup(hass, entry)
+    find.assert_awaited_once_with(hass, entry.data[CONF_HOST])
+    assert hass.states.get(WIFI_SIGNAL).state == "72"
+
+
+async def test_no_wifi_signal_without_wifi_link(hass: HomeAssistant, supervisor, entry) -> None:
+    # The fake burner is not on a Wi-Fi interface of the Supervisor.
+    await setup(hass, entry)
+    assert hass.states.get(WIFI_SIGNAL) is None
+    supervisor.client.network.interface_info.assert_not_awaited()
+
+
+async def test_setup_without_supervisor_answer(hass: HomeAssistant, supervisor, burner) -> None:
+    supervisor.client.network.interface_info.side_effect = SupervisorError("busy")
+    entry = wifi_entry(burner.host)
+    await setup(hass, entry)
+    assert entry.state is ConfigEntryState.LOADED
+    assert hass.states.get(WIFI_SIGNAL).state == "unavailable"

@@ -19,6 +19,7 @@ from homeassistant.helpers.entity_platform import AddConfigEntryEntitiesCallback
 from .api import BurnerState, WildflameStatus
 from .coordinator import WildflameConfigEntry, WildflameCoordinator
 from .entity import WildflameEntity
+from .wifi import WifiSignalCoordinator
 
 # Data comes from the coordinator.
 PARALLEL_UPDATES = 0
@@ -70,7 +71,11 @@ async def async_setup_entry(
     entry: WildflameConfigEntry,
     async_add_entities: AddConfigEntryEntitiesCallback,
 ) -> None:
-    async_add_entities(WildflameSensor(entry.runtime_data, desc) for desc in SENSORS)
+    coordinator = entry.runtime_data
+    sensors: list[SensorEntity] = [WildflameSensor(coordinator, desc) for desc in SENSORS]
+    if coordinator.wifi_signal:
+        sensors.append(WildflameWifiSignalSensor(coordinator.wifi_signal, "wifi_signal"))
+    async_add_entities(sensors)
 
 
 class WildflameSensor(WildflameEntity, SensorEntity):
@@ -86,3 +91,19 @@ class WildflameSensor(WildflameEntity, SensorEntity):
     @override
     def native_value(self) -> float | str | None:
         return self.entity_description.value_fn(self.coordinator.data)
+
+
+class WildflameWifiSignalSensor(WildflameEntity[WifiSignalCoordinator], SensorEntity):
+    """Strength of Home Assistant's Wi-Fi connection to the burner. Unknown while not connected.
+
+    No signal strength device class: that one needs dB or dBm, and NetworkManager reports %.
+    """
+
+    _attr_entity_category = EntityCategory.DIAGNOSTIC
+    _attr_native_unit_of_measurement = PERCENTAGE
+    _attr_state_class = SensorStateClass.MEASUREMENT
+
+    @property
+    @override
+    def native_value(self) -> int | None:
+        return self.coordinator.data

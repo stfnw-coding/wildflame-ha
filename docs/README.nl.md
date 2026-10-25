@@ -20,6 +20,7 @@ Home Assistant. Geen cloud: Home Assistant praat rechtstreeks met de haard via d
 | `sensor.<naam>_luchtvochtigheid` | Luchtvochtigheid in % |
 | `lock.<naam>_kinderslot` | Kinderslot op de haard: vergrendelen of ontgrendelen |
 | `sensor.<naam>_fasecode` | Ruwe fasecode (diagnostisch) |
+| `sensor.<naam>_wifi_signaal` | Signaalsterkte in % van de wifi-verbinding van Home Assistant met de haard (diagnostisch, alleen Home Assistant OS) |
 
 ### Veiligheid
 De haard kent alleen *toggle*- en *stap*-commando's: hetzelfde commando zet hem aan én uit. De integratie leest
@@ -97,7 +98,8 @@ Is het adres veranderd, of wil je het wifi-wachtwoord toevoegen of weghalen? Kie
 
 ## Hoe vaak wordt de status bijgewerkt?
 Home Assistant vraagt elke 5 seconden de status op, en direct na elk commando. Wat je op de haard zelf
-of met de officiële app doet, zie je dus binnen een paar seconden terug.
+of met de officiële app doet, zie je dus binnen een paar seconden terug. Het wifi-signaal komt van Home
+Assistant OS, één keer per minuut; zolang de wifi niet verbonden is, is het onbekend.
 
 ## Bekende beperkingen
 - De haard heeft alleen een eigen wifi; Home Assistant heeft een (tweede) wifi-verbinding daarmee nodig.
@@ -128,6 +130,8 @@ of met de officiële app doet, zie je dus binnen een paar seconden terug.
   Assistant OS een verbindingsprofiel "Supervisor wlan0" toe; dat kan geen kwaad.
 - **"Onbekende fase"**: de haard meldt een fasecode die de integratie nog niet kent, mogelijk een storing.
   Aanzetten is dan geblokkeerd. Meld de code en wat de haard laat zien in een issue.
+- **De wifi valt steeds weg**: kijk in de geschiedenis van de sensor Wifi-signaal. Een laag signaal vlak voor
+  elke onderbreking wijst op de afstand of een muur tussen Home Assistant en de haard.
 - Voeg bij een melding de diagnostiek toe: op de apparaatpagina **⋮ → Diagnostiek downloaden**.
 
 ## Verwijderen

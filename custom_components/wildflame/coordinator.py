@@ -30,6 +30,7 @@ from .const import (
     POWER_TOGGLE_GUARD_SECONDS,
     SCAN_INTERVAL,
 )
+from .wifi import WifiSignalCoordinator
 
 _LOGGER = logging.getLogger(__name__)
 
@@ -108,6 +109,8 @@ class WildflameCoordinator(DataUpdateCoordinator[WildflameStatus]):
         self._power_guard = _ToggleGuard()
         self._child_lock_guard = _ToggleGuard()
         self._warned_phases: set[int] = set()
+        # Set up after the first refresh, and only on Home Assistant OS with a Wi-Fi link to the burner.
+        self.wifi_signal: WifiSignalCoordinator | None = None
 
     @override
     async def _async_update_data(self) -> WildflameStatus:

@@ -22,6 +22,7 @@ Home Assistant. No cloud: Home Assistant talks directly to the burner over the b
 | `sensor.<name>_humidity` | Humidity in % |
 | `lock.<name>_child_lock` | Child lock on the burner: lock or unlock it |
 | `sensor.<name>_phase_code` | Raw phase code (diagnostic) |
+| `sensor.<name>_wi_fi_signal` | Signal strength in % of Home Assistant's Wi-Fi connection to the burner (diagnostic, Home Assistant OS only) |
 
 Entity names follow your Home Assistant language (English and Dutch included).
 
@@ -99,7 +100,8 @@ integration entry; there is no need to remove it.
 
 ## Data updates
 Home Assistant asks the burner for its status every 5 seconds, and right after every command. Changes made on
-the burner itself or with the official app therefore show up within a few seconds.
+the burner itself or with the official app therefore show up within a few seconds. The Wi-Fi signal comes from
+Home Assistant OS, once a minute; it is unknown while the Wi-Fi is not connected.
 
 ## Known limitations
 - The burner only offers its own Wi-Fi; Home Assistant needs a (second) Wi-Fi connection to it (see Requirements).
@@ -129,6 +131,8 @@ the burner itself or with the official app therefore show up within a few second
   in Home Assistant OS; they do no harm.
 - **"Unknown phase"**: the burner reports a phase code the integration does not know yet, possibly an error.
   Switching on is blocked. Please open an issue with the code and what the burner shows.
+- **The Wi-Fi keeps dropping**: look at the history of the Wi-Fi signal sensor. A low signal before each drop
+  points at the distance or a wall between Home Assistant and the burner.
 - When you report a problem, attach the diagnostics: on the device page, **⋮ → Download diagnostics**.
 
 ## Removal

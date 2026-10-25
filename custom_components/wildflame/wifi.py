@@ -14,6 +14,7 @@ import math
 import time
 from dataclasses import dataclass
 from datetime import timedelta
+from typing import override
 
 from aiohasupervisor import SupervisorError
 from aiohasupervisor.models import InterfaceType
@@ -26,6 +27,7 @@ from homeassistant.const import CONF_PASSWORD
 from homeassistant.core import CALLBACK_TYPE, HomeAssistant, callback
 from homeassistant.helpers.event import async_track_time_interval
 from homeassistant.helpers.hassio import is_hassio
+from homeassistant.helpers.update_coordinator import DataUpdateCoordinator, UpdateFailed
 from homeassistant.util.hass_dict import HassKey
 
 from .const import CONF_WIFI_INTERFACE, CONF_WIFI_SSID, DOMAIN, WIFI_CHECK_INTERVAL_SECONDS
@@ -80,6 +82,34 @@ async def async_find_wifi_link(hass: HomeAssistant, host: str) -> WifiLink | Non
         ):
             return WifiLink(interface.interface, interface.wifi.ssid)
     return None
+
+
+class WifiSignalCoordinator(DataUpdateCoordinator[int | None]):
+    """Signal strength of Home Assistant's Wi-Fi connection to the burner, in % as NetworkManager reports it.
+
+    None while the interface is not connected. Works without the Wi-Fi password: only the watchdog needs that.
+    """
+
+    def __init__(self, hass: HomeAssistant, entry: ConfigEntry, interface: str) -> None:
+        super().__init__(
+            hass,
+            _LOGGER,
+            config_entry=entry,
+            name=f"{DOMAIN} Wi-Fi signal",
+            update_interval=timedelta(seconds=WIFI_CHECK_INTERVAL_SECONDS),
+            always_update=False,
+        )
+        self.interface = interface
+
+    @override
+    async def _async_update_data(self) -> int | None:
+        try:
+            info = await get_supervisor_client(self.hass).network.interface_info(self.interface)
+        except SupervisorError as err:
+            raise UpdateFailed(f"No Wi-Fi information from the Supervisor: {err}") from err
+        if not (info.connected and info.wifi):
+            return None
+        return info.wifi.signal
 
 
 @callback

@@ -21,6 +21,9 @@
           "unknown_phase": "mdi:alert-circle-outline",
           "warming_up": "mdi:fire-circle"
         }
+      },
+      "wifi_signal": {
+        "default": "mdi:wifi"
       }
     },
     "switch": {

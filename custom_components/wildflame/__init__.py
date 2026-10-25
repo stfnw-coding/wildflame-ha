@@ -9,9 +9,14 @@ from homeassistant.helpers.aiohttp_client import async_create_clientsession
 from homeassistant.helpers.storage import Store
 
 from .api import WildflameClient
-from .const import DOMAIN
+from .const import CONF_WIFI_INTERFACE, DOMAIN
 from .coordinator import WildflameConfigEntry, WildflameCoordinator
-from .wifi import async_start_wifi_watchdog, async_stop_wifi_watchdog
+from .wifi import (
+    WifiSignalCoordinator,
+    async_find_wifi_link,
+    async_start_wifi_watchdog,
+    async_stop_wifi_watchdog,
+)
 
 PLATFORMS: list[Platform] = [
     Platform.LOCK,
@@ -31,6 +36,7 @@ async def async_setup_entry(hass: HomeAssistant, entry: WildflameConfigEntry) ->
     _remove_old_entities(hass, entry)
     await _remove_old_storage(hass, entry)
     await coordinator.async_config_entry_first_refresh()
+    coordinator.wifi_signal = await _async_wifi_signal(hass, entry)
     entry.runtime_data = coordinator
     await hass.config_entries.async_forward_entry_setups(entry, PLATFORMS)
     return True
@@ -43,6 +49,20 @@ async def async_unload_entry(hass: HomeAssistant, entry: WildflameConfigEntry) -
 
 async def async_remove_entry(hass: HomeAssistant, entry: WildflameConfigEntry) -> None:
     async_stop_wifi_watchdog(hass, entry.entry_id)
+
+
+async def _async_wifi_signal(
+    hass: HomeAssistant, entry: WildflameConfigEntry
+) -> WifiSignalCoordinator | None:
+    """Follows the Wi-Fi signal if Home Assistant OS reaches the burner over its own Wi-Fi interface."""
+    if not (interface := entry.data.get(CONF_WIFI_INTERFACE)):
+        if not (link := await async_find_wifi_link(hass, entry.data[CONF_HOST])):
+            return None
+        interface = link.interface
+    wifi_signal = WifiSignalCoordinator(hass, entry, interface)
+    # Not a first refresh: without an answer from the Supervisor the burner still works.
+    await wifi_signal.async_refresh()
+    return wifi_signal
 
 
 # Entities from earlier versions that no longer exist.

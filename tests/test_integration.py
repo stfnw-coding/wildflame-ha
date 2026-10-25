@@ -51,6 +51,7 @@ async def test_entities_created(hass: HomeAssistant, entry, burner) -> None:
     assert hass.states.get("sensor.haard_luchtvochtigheid").state == "45.0"
     assert hass.states.get(CHILD_LOCK).state == "unlocked"
     assert hass.states.get(FLAME).state == "unavailable"  # only adjustable while burning
+    assert hass.states.get("sensor.haard_wifi_signaal") is None  # no Home Assistant OS
 
 
 async def test_turn_on_and_off(hass: HomeAssistant, entry, burner) -> None:

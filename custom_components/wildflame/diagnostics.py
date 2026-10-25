@@ -27,4 +27,10 @@ async def async_get_config_entry_diagnostics(
         }
         if status
         else None,
+        "wifi_signal": {
+            "interface": coordinator.wifi_signal.interface,
+            "signal": coordinator.wifi_signal.data,
+        }
+        if coordinator.wifi_signal
+        else None,
     }

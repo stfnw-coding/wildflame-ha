@@ -29,3 +29,4 @@ async def test_diagnostics(
         },
         "state": "burning",
     }
+    assert diagnostics["wifi_signal"] is None

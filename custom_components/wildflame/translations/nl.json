@@ -69,6 +69,9 @@
       },
       "phase": {
         "name": "Fasecode"
+      },
+      "wifi_signal": {
+        "name": "Wifi-signaal"
       }
     }
   },
