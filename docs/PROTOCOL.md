@@ -6,6 +6,13 @@ Observed on a Smart Fire A6 (80 cm) with the iOS app "Wild Flame" 1.1.0, October
 - The burner runs a Wi-Fi access point named `WILDFLAME…` and hands out addresses in `192.168.4.0/24`.
 - It serves plain HTTP on `192.168.4.1:80`. There is no authentication and no session.
 - Every response closes the connection; there is no `Content-Length` header.
+- The path is ignored: a GET to any path (`/`, `/robots.txt`, a path that does not exist) returns the same status
+  line as `/info.php`, and `HEAD` answers `200`. There are no other pages.
+- Port 80 is the only open TCP port of 21, 22, 23, 53, 80, 81, 443, 502, 1883, 2323, 5000, 8080, 8266, 8888 and
+  9000 (checked 2026-10-25 with `tools/wildflame-probe.sh`). So no telnet serial bridge, MQTT or OTA port.
+- The access point's MAC starts with `1a:fe:34`, the soft-AP range of the Espressif ESP8266. The `usart` field
+  names suggest it only passes on values it gets over a serial link from the burner's controller.
+- The official app (decompiled, version 1.1.0) uses nothing but the status and the four commands below.
 
 ## Status: `GET /info.php`
 ```
