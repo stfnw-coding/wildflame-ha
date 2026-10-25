@@ -123,9 +123,10 @@ the burner itself or with the official app therefore show up within a few second
   every minute, also while the integration itself cannot start because the burner is unreachable. When the
   interface has been down for a minute and the burner's network is on the air, it applies the Wi-Fi settings
   again (WPA-PSK, IPv4 automatic) and sets the integration up again right away. The log then shows
-  "Home Assistant lost its Wi-Fi connection to the burner". If that does not help, it waits longer each time,
-  up to half an hour. Each such reconnect adds a "Supervisor wlan0" connection profile in Home Assistant OS;
-  they do no harm.
+  "Home Assistant lost its Wi-Fi connection to the burner". The burner often turns Home Assistant away for a
+  while and lets it in a little later, so a reconnect that fails is tried again every 2 minutes; after 10
+  tries (a wrong password, say) only every 30 minutes. Each try adds a "Supervisor wlan0" connection profile
+  in Home Assistant OS; they do no harm.
 - **"Unknown phase"**: the burner reports a phase code the integration does not know yet, possibly an error.
   Switching on is blocked. Please open an issue with the code and what the burner shows.
 - When you report a problem, attach the diagnostics: on the device page, **⋮ → Download diagnostics**.

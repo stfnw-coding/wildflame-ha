@@ -32,9 +32,13 @@ from .const import CONF_WIFI_INTERFACE, CONF_WIFI_SSID, DOMAIN, WIFI_CHECK_INTER
 
 _LOGGER = logging.getLogger(__name__)
 
-# A reconnect while the interface is down adds a connection profile in NetworkManager, so if one does not
-# help (a wrong password, say), wait 2, 4, 8, 16 and then 32 minutes before trying again.
-_MAX_BACKOFF_DOUBLINGS = 5
+# The burner's access point turns Home Assistant away at times (association rejected, status 16) and lets it in
+# a few seconds later, and NetworkManager gives up after a few tries in about 25 seconds. So a reconnect often
+# fails and the next one, soon after, gets in: try every 2 minutes. Each try adds a connection profile in
+# NetworkManager, so after 10 tries (a wrong password, say) only try every 30 minutes.
+_RETRY_SECONDS = 2 * 60
+_FAST_RETRIES = 10
+_SLOW_RETRY_SECONDS = 30 * 60
 
 # One watchdog per config entry. Not tied to the entry's setup: Home Assistant cancels an entry's tasks when
 # its setup fails, and setup fails exactly while the burner is unreachable.
@@ -176,8 +180,9 @@ class WifiWatchdog:
             interface,
         )
         self._reconnects += 1
-        self._next_reconnect = now + WIFI_CHECK_INTERVAL_SECONDS * 2 ** min(
-            self._reconnects, _MAX_BACKOFF_DOUBLINGS
+        # Checks run every WIFI_CHECK_INTERVAL_SECONDS; the slack keeps a check that runs a little early in time.
+        self._next_reconnect = now - WIFI_CHECK_INTERVAL_SECONDS / 2 + (
+            _RETRY_SECONDS if self._reconnects < _FAST_RETRIES else _SLOW_RETRY_SECONDS
         )
         # Same settings as the README asks for. Sent as raw JSON: aiohasupervisor names the Wi-Fi
         # security field "method", but the Supervisor expects "auth".

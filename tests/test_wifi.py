@@ -167,49 +167,50 @@ async def test_waits_for_burner_wifi_on_the_air(hass: HomeAssistant, supervisor,
     supervisor.send_command.assert_awaited_once()
 
 
-async def test_reconnects_back_off_until_wifi_works(hass: HomeAssistant, supervisor, tick) -> None:
+async def test_retries_every_2_minutes_then_every_30(hass: HomeAssistant, supervisor, tick) -> None:
     watched_entry(hass)
     lose_wifi(supervisor)
     await tick(2)
     assert supervisor.send_command.await_count == 1
-    # The reconnect did not help: wait 2 minutes, then 4.
+    # The burner turned the reconnect away: try again 2 minutes later, 10 times in all.
+    for tries in range(2, 11):
+        await tick()
+        assert supervisor.send_command.await_count == tries - 1
+        await tick()
+        assert supervisor.send_command.await_count == tries
+    # Then every 30 minutes: a wrong password, say, should not add a profile every 2 minutes.
+    await tick(29)
+    assert supervisor.send_command.await_count == 10
     await tick()
-    assert supervisor.send_command.await_count == 1
-    await tick()
-    assert supervisor.send_command.await_count == 2
-    await tick(3)
-    assert supervisor.send_command.await_count == 2
-    await tick()
-    assert supervisor.send_command.await_count == 3
+    assert supervisor.send_command.await_count == 11
+    await tick(30)
+    assert supervisor.send_command.await_count == 12
 
     # Once the Wi-Fi worked again, a next loss is handled quickly again.
     supervisor.client.network.interface_info.return_value = WLAN
     await tick()
     lose_wifi(supervisor)
     await tick(2)
-    assert supervisor.send_command.await_count == 4
+    assert supervisor.send_command.await_count == 13
 
 
-async def test_connecting_does_not_reset_the_backoff(hass: HomeAssistant, supervisor, tick) -> None:
+async def test_connecting_does_not_reset_the_retries(hass: HomeAssistant, supervisor, tick) -> None:
     watched_entry(hass)
+    lose_wifi(supervisor)
+    await tick(2)
+    # NetworkManager tries the settings (a wrong password, say) and fails again, 10 times.
     connecting = interface("wlan0", InterfaceType.WIRELESS, None, connected=True)
-
-    async def connect_and_fail(checks: int) -> None:
-        # NetworkManager tries the settings (a wrong password, say) and fails again.
+    for _ in range(9):
         supervisor.client.network.interface_info.return_value = connecting
         await tick()
         lose_wifi(supervisor)
-        await tick(checks)
-
-    lose_wifi(supervisor)
-    await tick(2)
-    await connect_and_fail(2)
-    assert supervisor.send_command.await_count == 2
-    # Without an address the connection never worked: the wait doubled to 4 minutes.
-    await connect_and_fail(2)
-    assert supervisor.send_command.await_count == 2
+        await tick(2)
+    assert supervisor.send_command.await_count == 10
+    # Without an address the connection never worked: now 30 minutes until the next try.
+    await tick(29)
+    assert supervisor.send_command.await_count == 10
     await tick()
-    assert supervisor.send_command.await_count == 3
+    assert supervisor.send_command.await_count == 11
 
 
 @pytest.mark.parametrize("error", [SupervisorError("busy"), HassioAPIError()])

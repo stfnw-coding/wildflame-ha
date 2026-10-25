@@ -122,9 +122,10 @@ of met de officiële app doet, zie je dus binnen een paar seconden terug.
   de wifi-interface, ook als de integratie zelf niet kan starten omdat de haard onbereikbaar is. Is de
   interface een minuut niet verbonden en is het wifi van de haard wel in de lucht, dan past hij de
   wifi-instellingen opnieuw toe (WPA-PSK, IPv4 automatisch) en start de integratie meteen opnieuw. In het
-  logboek staat dan "Home Assistant lost its Wi-Fi connection to the burner". Helpt dat niet, dan wacht hij
-  elke keer langer, tot een half uur. Elke herverbinding voegt in Home Assistant OS een verbindingsprofiel
-  "Supervisor wlan0" toe; dat kan geen kwaad.
+  logboek staat dan "Home Assistant lost its Wi-Fi connection to the burner". De haard weigert Home Assistant
+  vaak een tijdje en laat hem even later wel toe, dus een mislukte poging wordt elke 2 minuten herhaald; na
+  10 pogingen (bij een fout wachtwoord bijvoorbeeld) nog maar elke 30 minuten. Elke poging voegt in Home
+  Assistant OS een verbindingsprofiel "Supervisor wlan0" toe; dat kan geen kwaad.
 - **"Onbekende fase"**: de haard meldt een fasecode die de integratie nog niet kent, mogelijk een storing.
   Aanzetten is dan geblokkeerd. Meld de code en wat de haard laat zien in een issue.
 - Voeg bij een melding de diagnostiek toe: op de apparaatpagina **⋮ → Diagnostiek downloaden**.
