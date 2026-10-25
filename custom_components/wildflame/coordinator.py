@@ -21,7 +21,6 @@ from .api import (
     FLAME_MIN,
     BurnerState,
     WildflameClient,
-    WildflameConnectionError,
     WildflameError,
     WildflameStatus,
 )
@@ -31,7 +30,6 @@ from .const import (
     POWER_TOGGLE_GUARD_SECONDS,
     SCAN_INTERVAL,
 )
-from .wifi import WifiRecovery
 
 _LOGGER = logging.getLogger(__name__)
 
@@ -95,7 +93,6 @@ class WildflameCoordinator(DataUpdateCoordinator[WildflameStatus]):
         hass: HomeAssistant,
         entry: WildflameConfigEntry,
         client: WildflameClient,
-        wifi_recovery: WifiRecovery | None = None,
     ) -> None:
         super().__init__(
             hass,
@@ -107,7 +104,6 @@ class WildflameCoordinator(DataUpdateCoordinator[WildflameStatus]):
             always_update=False,
         )
         self.client = client
-        self._wifi_recovery = wifi_recovery
         self._command_lock = asyncio.Lock()
         self._power_guard = _ToggleGuard()
         self._child_lock_guard = _ToggleGuard()
@@ -117,14 +113,8 @@ class WildflameCoordinator(DataUpdateCoordinator[WildflameStatus]):
     async def _async_update_data(self) -> WildflameStatus:
         try:
             status = await self.client.get_status()
-        except WildflameConnectionError as err:
-            if self._wifi_recovery:
-                self._wifi_recovery.async_burner_unreachable()
-            raise UpdateFailed(str(err)) from err
         except WildflameError as err:
             raise UpdateFailed(str(err)) from err
-        if self._wifi_recovery:
-            self._wifi_recovery.async_burner_reachable()
         self._power_guard.observe(status.powered)
         self._child_lock_guard.observe(status.child_lock)
         if status.state is BurnerState.UNKNOWN_PHASE and status.phase not in self._warned_phases:

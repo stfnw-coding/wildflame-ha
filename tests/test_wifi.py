@@ -1,5 +1,6 @@
 """Tests for reconnecting Home Assistant OS to the burner's Wi-Fi."""
 
+from datetime import timedelta
 from ipaddress import ip_interface
 from types import SimpleNamespace
 from unittest.mock import AsyncMock, MagicMock, patch
@@ -9,18 +10,24 @@ from aiohasupervisor import SupervisorError
 from aiohasupervisor.models import InterfaceType
 from homeassistant.components.hassio.const import DATA_COMPONENT
 from homeassistant.components.hassio.handler import HassioAPIError
-from homeassistant.config_entries import SOURCE_USER
+from freezegun.api import FrozenDateTimeFactory
+from homeassistant.config_entries import SOURCE_USER, ConfigEntryDisabler, ConfigEntryState
 from homeassistant.const import CONF_HOST, CONF_PASSWORD
 from homeassistant.core import HomeAssistant
 from homeassistant.data_entry_flow import FlowResultType
-from pytest_homeassistant_custom_component.common import MockConfigEntry
+from pytest_homeassistant_custom_component.common import MockConfigEntry, async_fire_time_changed
 from pytest_homeassistant_custom_component.components.diagnostics import (
     get_diagnostics_for_config_entry,
 )
 from pytest_homeassistant_custom_component.typing import ClientSessionGenerator
 
-from custom_components.wildflame.const import CONF_WIFI_INTERFACE, CONF_WIFI_SSID, DOMAIN
-from custom_components.wildflame.wifi import WifiLink, WifiRecovery, async_find_wifi_link
+from custom_components.wildflame.const import (
+    CONF_WIFI_INTERFACE,
+    CONF_WIFI_SSID,
+    DOMAIN,
+    WIFI_CHECK_INTERVAL_SECONDS,
+)
+from custom_components.wildflame.wifi import WifiLink, async_find_wifi_link, async_start_wifi_watchdog
 
 from .test_integration import setup
 
@@ -93,12 +100,33 @@ async def test_find_wifi_link_without_supervisor(hass: HomeAssistant) -> None:
     assert await async_find_wifi_link(hass, "192.168.4.1") is None
 
 
-async def test_reconnects_when_wifi_gave_up(hass: HomeAssistant, supervisor) -> None:
-    entry = wifi_entry("192.168.4.1")
+@pytest.fixture
+def tick(hass: HomeAssistant, freezer: FrozenDateTimeFactory):
+    """Let time pass one check interval at a time, waiting for each Wi-Fi check to finish."""
+
+    async def tick(checks: int = 1) -> None:
+        for _ in range(checks):
+            freezer.tick(timedelta(seconds=WIFI_CHECK_INTERVAL_SECONDS))
+            async_fire_time_changed(hass)
+            await hass.async_block_till_done(wait_background_tasks=True)
+
+    return tick
+
+
+def watched_entry(hass: HomeAssistant, host: str = "192.168.4.1") -> MockConfigEntry:
+    entry = wifi_entry(host)
     entry.add_to_hass(hass)
+    async_start_wifi_watchdog(hass, entry)
+    return entry
+
+
+async def test_reconnects_when_wifi_gave_up(hass: HomeAssistant, supervisor, tick) -> None:
+    watched_entry(hass)
     lose_wifi(supervisor)
-    WifiRecovery(hass, entry, WifiLink("wlan0", SSID), PASSWORD).async_burner_unreachable()
-    await hass.async_block_till_done()
+    # The first check gives NetworkManager a minute to reconnect by itself.
+    await tick()
+    supervisor.send_command.assert_not_awaited()
+    await tick()
     supervisor.send_command.assert_awaited_once()
     command, kwargs = supervisor.send_command.await_args.args[0], supervisor.send_command.await_args.kwargs
     assert command == "/network/interface/wlan0/update"
@@ -109,100 +137,160 @@ async def test_reconnects_when_wifi_gave_up(hass: HomeAssistant, supervisor) -> 
     }
 
 
-async def test_leaves_working_wifi_alone(hass: HomeAssistant, supervisor) -> None:
-    entry = wifi_entry("192.168.4.1")
-    entry.add_to_hass(hass)
-    WifiRecovery(hass, entry, WifiLink("wlan0", SSID), PASSWORD).async_burner_unreachable()
-    await hass.async_block_till_done()
+async def test_leaves_working_wifi_alone(hass: HomeAssistant, supervisor, tick) -> None:
+    watched_entry(hass)
+    await tick(3)
+    assert supervisor.client.network.interface_info.await_count == 3
     supervisor.client.network.access_points.assert_not_awaited()
     supervisor.send_command.assert_not_awaited()
 
 
-async def test_waits_for_burner_wifi_on_the_air(hass: HomeAssistant, supervisor) -> None:
-    entry = wifi_entry("192.168.4.1")
-    entry.add_to_hass(hass)
+async def test_leaves_a_brief_drop_to_networkmanager(hass: HomeAssistant, supervisor, tick) -> None:
+    watched_entry(hass)
     lose_wifi(supervisor)
-    supervisor.client.network.access_points.return_value = [SimpleNamespace(ssid="Neighbours")]
-    WifiRecovery(hass, entry, WifiLink("wlan0", SSID), PASSWORD).async_burner_unreachable()
-    await hass.async_block_till_done()
+    await tick()
+    supervisor.client.network.interface_info.return_value = WLAN
+    await tick()
+    lose_wifi(supervisor)
+    await tick()
     supervisor.send_command.assert_not_awaited()
 
 
-async def unreachable_at(hass: HomeAssistant, recovery: WifiRecovery, now: float) -> None:
-    with patch("custom_components.wildflame.wifi.time.monotonic", return_value=now):
-        recovery.async_burner_unreachable()
-        await hass.async_block_till_done()
-
-
-async def test_checks_at_most_every_interval(hass: HomeAssistant, supervisor) -> None:
-    entry = wifi_entry("192.168.4.1")
-    entry.add_to_hass(hass)
-    link = WifiLink("wlan0", SSID)
-    await unreachable_at(hass, WifiRecovery(hass, entry, link, PASSWORD), 1000)
-    # A setup retry makes a new instance; it must not check again right away.
-    await unreachable_at(hass, WifiRecovery(hass, entry, link, PASSWORD), 1119)
-    assert supervisor.client.network.interface_info.await_count == 1
-    await unreachable_at(hass, WifiRecovery(hass, entry, link, PASSWORD), 1120)
-    assert supervisor.client.network.interface_info.await_count == 2
-
-
-async def test_reconnects_back_off_until_burner_answers(hass: HomeAssistant, supervisor) -> None:
-    entry = wifi_entry("192.168.4.1")
-    entry.add_to_hass(hass)
+async def test_waits_for_burner_wifi_on_the_air(hass: HomeAssistant, supervisor, tick) -> None:
+    watched_entry(hass)
     lose_wifi(supervisor)
-    recovery = WifiRecovery(hass, entry, WifiLink("wlan0", SSID), PASSWORD)
-    await unreachable_at(hass, recovery, 1000)
+    supervisor.client.network.access_points.return_value = [SimpleNamespace(ssid="Neighbours")]
+    await tick(3)
+    supervisor.send_command.assert_not_awaited()
+    supervisor.client.network.access_points.return_value = [SimpleNamespace(ssid=SSID)]
+    await tick()
+    supervisor.send_command.assert_awaited_once()
+
+
+async def test_reconnects_back_off_until_wifi_works(hass: HomeAssistant, supervisor, tick) -> None:
+    watched_entry(hass)
+    lose_wifi(supervisor)
+    await tick(2)
     assert supervisor.send_command.await_count == 1
-    # The reconnect did not help: wait 4 minutes, then 8.
-    await unreachable_at(hass, recovery, 1000 + 239)
+    # The reconnect did not help: wait 2 minutes, then 4.
+    await tick()
     assert supervisor.send_command.await_count == 1
-    await unreachable_at(hass, recovery, 1000 + 240)
+    await tick()
     assert supervisor.send_command.await_count == 2
-    await unreachable_at(hass, recovery, 1240 + 479)
+    await tick(3)
     assert supervisor.send_command.await_count == 2
-    await unreachable_at(hass, recovery, 1240 + 480)
+    await tick()
     assert supervisor.send_command.await_count == 3
 
-    # Once the burner answered, a next loss is handled with a short wait again.
-    recovery.async_burner_reachable()
-    await unreachable_at(hass, recovery, 1720 + 960)
-    await unreachable_at(hass, recovery, 2680 + 240)
-    assert supervisor.send_command.await_count == 5
+    # Once the Wi-Fi worked again, a next loss is handled quickly again.
+    supervisor.client.network.interface_info.return_value = WLAN
+    await tick()
+    lose_wifi(supervisor)
+    await tick(2)
+    assert supervisor.send_command.await_count == 4
+
+
+async def test_connecting_does_not_reset_the_backoff(hass: HomeAssistant, supervisor, tick) -> None:
+    watched_entry(hass)
+    connecting = interface("wlan0", InterfaceType.WIRELESS, None, connected=True)
+
+    async def connect_and_fail(checks: int) -> None:
+        # NetworkManager tries the settings (a wrong password, say) and fails again.
+        supervisor.client.network.interface_info.return_value = connecting
+        await tick()
+        lose_wifi(supervisor)
+        await tick(checks)
+
+    lose_wifi(supervisor)
+    await tick(2)
+    await connect_and_fail(2)
+    assert supervisor.send_command.await_count == 2
+    # Without an address the connection never worked: the wait doubled to 4 minutes.
+    await connect_and_fail(2)
+    assert supervisor.send_command.await_count == 2
+    await tick()
+    assert supervisor.send_command.await_count == 3
 
 
 @pytest.mark.parametrize("error", [SupervisorError("busy"), HassioAPIError()])
 async def test_reconnect_failure_is_logged(
-    hass: HomeAssistant, supervisor, caplog: pytest.LogCaptureFixture, error
+    hass: HomeAssistant, supervisor, tick, caplog: pytest.LogCaptureFixture, error
 ) -> None:
-    entry = wifi_entry("192.168.4.1")
-    entry.add_to_hass(hass)
+    watched_entry(hass)
     lose_wifi(supervisor)
     supervisor.send_command.side_effect = error
-    WifiRecovery(hass, entry, WifiLink("wlan0", SSID), PASSWORD).async_burner_unreachable()
-    await hass.async_block_till_done()
+    await tick(2)
     assert "Could not restore the Wi-Fi connection to the burner" in caplog.text
+    # The next check still runs.
+    await tick()
+    assert supervisor.client.network.interface_info.await_count == 3
 
 
-async def test_unreachable_burner_triggers_recovery(hass: HomeAssistant, supervisor, burner) -> None:
+async def test_reconnects_while_setup_retries(hass: HomeAssistant, supervisor, burner, tick) -> None:
+    """The Wi-Fi went down and Home Assistant restarted: setup keeps failing until the link is back."""
+    await burner.stop()
+    entry = wifi_entry(burner.host)
+    entry.add_to_hass(hass)
+    await hass.config_entries.async_setup(entry.entry_id)
+    await hass.async_block_till_done()
+    assert entry.state is ConfigEntryState.SETUP_RETRY
+    # Retries wait up to 10 minutes; leave out Home Assistant's next one.
+    entry.async_cancel_retry_setup()
+
+    lose_wifi(supervisor)
+    await tick()
+    await burner.start()
+    await tick()
+    supervisor.send_command.assert_awaited_once()
+    # Set up right away after the reconnect.
+    assert entry.state is ConfigEntryState.LOADED
+
+
+async def test_unreachable_burner_on_working_wifi(hass: HomeAssistant, supervisor, burner, tick) -> None:
     entry = wifi_entry(burner.host)
     await setup(hass, entry)
-    supervisor.client.network.interface_info.assert_not_awaited()
-
     await burner.stop()
+    await tick(3)
+    supervisor.client.network.access_points.assert_not_awaited()
+    supervisor.send_command.assert_not_awaited()
+
+
+async def test_survives_a_reload(hass: HomeAssistant, supervisor, burner, tick) -> None:
+    entry = wifi_entry(burner.host)
+    await setup(hass, entry)
     lose_wifi(supervisor)
-    await entry.runtime_data.async_refresh()
-    await hass.async_block_till_done()
+    await tick()
+    assert await hass.config_entries.async_reload(entry.entry_id)
+    await tick()
     supervisor.send_command.assert_awaited_once()
 
 
-async def test_no_recovery_without_password(hass: HomeAssistant, supervisor, entry, burner) -> None:
+async def test_no_watchdog_without_password(hass: HomeAssistant, supervisor, entry, tick) -> None:
     await setup(hass, entry)
-    await burner.stop()
     lose_wifi(supervisor)
-    await entry.runtime_data.async_refresh()
-    await hass.async_block_till_done()
+    await tick(3)
     supervisor.client.network.interface_info.assert_not_awaited()
-    supervisor.send_command.assert_not_awaited()
+
+
+async def test_stops_when_entry_removed(hass: HomeAssistant, supervisor, burner, tick) -> None:
+    entry = wifi_entry(burner.host)
+    await setup(hass, entry)
+    await hass.config_entries.async_remove(entry.entry_id)
+    await tick(2)
+    supervisor.client.network.interface_info.assert_not_awaited()
+
+
+async def test_stops_when_entry_disabled(hass: HomeAssistant, supervisor, burner, tick) -> None:
+    await burner.stop()
+    entry = wifi_entry(burner.host)
+    entry.add_to_hass(hass)
+    await hass.config_entries.async_setup(entry.entry_id)
+    await hass.async_block_till_done()
+    assert entry.state is ConfigEntryState.SETUP_RETRY
+    # Not loaded, so Home Assistant does not unload it: the watchdog notices by itself.
+    await hass.config_entries.async_set_disabled_by(entry.entry_id, ConfigEntryDisabler.USER)
+    await tick(2)
+    supervisor.client.network.interface_info.assert_not_awaited()
 
 
 async def test_user_flow_with_password(hass: HomeAssistant, burner) -> None:
@@ -239,14 +327,17 @@ async def test_user_flow_password_without_wifi(hass: HomeAssistant, burner) -> N
     assert result["data"] == {CONF_HOST: burner.host}
 
 
-async def test_reconfigure_removes_password(hass: HomeAssistant, supervisor, burner) -> None:
+async def test_reconfigure_removes_password(hass: HomeAssistant, supervisor, burner, tick) -> None:
     entry = wifi_entry(burner.host)
-    entry.add_to_hass(hass)
+    await setup(hass, entry)
     result = await entry.start_reconfigure_flow(hass)
     result = await hass.config_entries.flow.async_configure(result["flow_id"], {CONF_HOST: burner.host})
     await hass.async_block_till_done()
     assert result["reason"] == "reconfigure_successful"
     assert entry.data == {CONF_HOST: burner.host}
+    # Without the password the Wi-Fi is no longer watched.
+    await tick(2)
+    supervisor.client.network.interface_info.assert_not_awaited()
     await hass.config_entries.async_unload(entry.entry_id)
 
 

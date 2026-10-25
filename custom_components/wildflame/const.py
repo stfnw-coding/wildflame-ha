@@ -19,5 +19,5 @@ FLAME_STEP_DELAY_SECONDS = 1.0
 CONF_WIFI_INTERFACE = "wifi_interface"
 CONF_WIFI_SSID = "wifi_ssid"
 
-# While the burner is unreachable, check this often whether Home Assistant's Wi-Fi connection gave up.
-WIFI_CHECK_INTERVAL_SECONDS = 120
+# Check this often whether Home Assistant OS gave up on its Wi-Fi connection to the burner.
+WIFI_CHECK_INTERVAL_SECONDS = 60

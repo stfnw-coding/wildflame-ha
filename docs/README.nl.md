@@ -118,11 +118,13 @@ of met de officiële app doet, zie je dus binnen een paar seconden terug.
   Assistant OS de mislukte herverbinding als een fout wachtwoord zien en stoppen met proberen. WLAN0 heeft dan
   geen `192.168.4.x`-adres. Open WLAN0 onder Instellingen → Systeem → Netwerk, vul het wifi-wachtwoord van de
   haard opnieuw in en sla op; de integratie maakt binnen een paar minuten vanzelf weer verbinding.
-  Heb je het wifi-wachtwoord ingevuld (Toevoegen), dan doet de integratie dit zelf: zolang de haard
-  onbereikbaar is, kijkt hij elke 2 minuten, en als de wifi-interface niet verbonden is maar het wifi van de
-  haard wel in de lucht is, past hij de wifi-instellingen opnieuw toe (WPA-PSK, IPv4 automatisch). In het
+  Heb je het wifi-wachtwoord ingevuld (Toevoegen), dan doet de integratie dit zelf: hij kijkt elke minuut naar
+  de wifi-interface, ook als de integratie zelf niet kan starten omdat de haard onbereikbaar is. Is de
+  interface een minuut niet verbonden en is het wifi van de haard wel in de lucht, dan past hij de
+  wifi-instellingen opnieuw toe (WPA-PSK, IPv4 automatisch) en start de integratie meteen opnieuw. In het
   logboek staat dan "Home Assistant lost its Wi-Fi connection to the burner". Helpt dat niet, dan wacht hij
-  elke keer langer, tot ongeveer een uur.
+  elke keer langer, tot een half uur. Elke herverbinding voegt in Home Assistant OS een verbindingsprofiel
+  "Supervisor wlan0" toe; dat kan geen kwaad.
 - **"Onbekende fase"**: de haard meldt een fasecode die de integratie nog niet kent, mogelijk een storing.
   Aanzetten is dan geblokkeerd. Meld de code en wat de haard laat zien in een issue.
 - Voeg bij een melding de diagnostiek toe: op de apparaatpagina **⋮ → Diagnostiek downloaden**.

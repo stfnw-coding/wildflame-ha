@@ -48,7 +48,8 @@ class FakeBurner:
             self.child_lock = 0 if self.child_lock else 1
 
     async def start(self) -> None:
-        self._server = await asyncio.start_server(self._handle, "127.0.0.1", 0)
+        # A restart keeps the port, so the burner is back at the same address.
+        self._server = await asyncio.start_server(self._handle, "127.0.0.1", self.port)
         self.port = self._server.sockets[0].getsockname()[1]
 
     async def stop(self) -> None:
