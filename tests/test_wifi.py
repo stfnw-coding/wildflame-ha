@@ -251,11 +251,77 @@ async def test_reconnects_while_setup_retries(hass: HomeAssistant, supervisor, b
 
 
 async def test_unreachable_burner_on_working_wifi(hass: HomeAssistant, supervisor, burner, tick) -> None:
+    """A burner that skips answers for a minute or two is left alone."""
     entry = wifi_entry(burner.host)
     await setup(hass, entry)
     await burner.stop()
+    await tick(2)
+    await burner.start()
     await tick(3)
     supervisor.client.network.access_points.assert_not_awaited()
+    supervisor.send_command.assert_not_awaited()
+
+
+async def test_reconnects_a_stuck_link(
+    hass: HomeAssistant, supervisor, burner, tick, caplog: pytest.LogCaptureFixture
+) -> None:
+    """The interface stays connected with an address, but the burner stops answering until the Wi-Fi reconnects."""
+    entry = wifi_entry(burner.host)
+    await setup(hass, entry)
+    await burner.stop()
+    # The first failed poll is at the first tick; 3 minutes after it the link counts as stuck.
+    await tick(3)
+    supervisor.send_command.assert_not_awaited()
+    await tick()
+    supervisor.send_command.assert_awaited_once()
+    assert supervisor.send_command.await_args.args[0] == "/network/interface/wlan0/update"
+    assert "is up, but the burner has not answered for 3 minutes; reconnecting" in caplog.text
+
+    # Still silent after reconnecting: the connected interface does not reset the retries, so the next try
+    # comes 2 minutes later instead of every minute.
+    await tick()
+    assert supervisor.send_command.await_count == 1
+    await tick()
+    assert supervisor.send_command.await_count == 2
+
+    # Once the burner answers again, the link is left alone.
+    await burner.start()
+    await tick(5)
+    assert supervisor.send_command.await_count == 2
+    assert entry.state is ConfigEntryState.LOADED
+
+
+async def test_stuck_link_while_setup_retries(hass: HomeAssistant, supervisor, burner, tick) -> None:
+    """Home Assistant restarted while the link was stuck: failed setup attempts count as no answer."""
+    await burner.stop()
+    entry = wifi_entry(burner.host)
+    entry.add_to_hass(hass)
+    await hass.config_entries.async_setup(entry.entry_id)
+    await hass.async_block_till_done()
+    assert entry.state is ConfigEntryState.SETUP_RETRY
+    entry.async_cancel_retry_setup()
+    # 3 minutes after the failed setup the Wi-Fi reconnects, and setup is tried again right away.
+    await tick(2)
+    supervisor.send_command.assert_not_awaited()
+    await burner.start()
+    await tick()
+    supervisor.send_command.assert_awaited_once()
+    assert entry.state is ConfigEntryState.LOADED
+
+
+async def test_stuck_link_burner_not_on_the_air(hass: HomeAssistant, supervisor, burner, tick) -> None:
+    entry = wifi_entry(burner.host)
+    await setup(hass, entry)
+    await burner.stop()
+    supervisor.client.network.access_points.return_value = [SimpleNamespace(ssid="Neighbours")]
+    await tick(5)
+    supervisor.send_command.assert_not_awaited()
+
+
+async def test_no_stuck_link_without_reports(hass: HomeAssistant, supervisor, tick) -> None:
+    """Without polls (polling disabled, say) nothing says the burner is silent: a connected link is left alone."""
+    watched_entry(hass)
+    await tick(10)
     supervisor.send_command.assert_not_awaited()
 
 

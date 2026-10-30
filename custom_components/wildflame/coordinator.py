@@ -5,6 +5,7 @@ from __future__ import annotations
 import asyncio
 import logging
 import time
+from collections.abc import Callable
 from typing import override
 
 from homeassistant.config_entries import ConfigEntry
@@ -30,7 +31,7 @@ from .const import (
     POWER_TOGGLE_GUARD_SECONDS,
     SCAN_INTERVAL,
 )
-from .wifi import WifiSignalCoordinator
+from .wifi import WifiSignalCoordinator, async_burner_reachable
 
 _LOGGER = logging.getLogger(__name__)
 
@@ -114,10 +115,7 @@ class WildflameCoordinator(DataUpdateCoordinator[WildflameStatus]):
 
     @override
     async def _async_update_data(self) -> WildflameStatus:
-        try:
-            status = await self.client.get_status()
-        except WildflameError as err:
-            raise UpdateFailed(str(err)) from err
+        status = await self._get_status(UpdateFailed)
         self._power_guard.observe(status.powered)
         self._child_lock_guard.observe(status.child_lock)
         if status.state is BurnerState.UNKNOWN_PHASE and status.phase not in self._warned_phases:
@@ -180,11 +178,18 @@ class WildflameCoordinator(DataUpdateCoordinator[WildflameStatus]):
                 status = await self._fresh_status()
 
     async def _fresh_status(self) -> WildflameStatus:
+        status = await self._get_status(lambda message: _error("cannot_connect", error=message))
+        self.async_set_updated_data(status)
+        return status
+
+    async def _get_status(self, failure: Callable[[str], Exception]) -> WildflameStatus:
+        """The burner's status; tells the Wi-Fi watchdog whether the burner answered."""
         try:
             status = await self.client.get_status()
         except WildflameError as err:
-            raise _error("cannot_connect", error=str(err)) from err
-        self.async_set_updated_data(status)
+            async_burner_reachable(self.hass, self.config_entry.entry_id, False)
+            raise failure(str(err)) from err
+        async_burner_reachable(self.hass, self.config_entry.entry_id, True)
         return status
 
     async def _send(self, code: str) -> None:

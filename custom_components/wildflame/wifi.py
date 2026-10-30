@@ -4,6 +4,10 @@ When the burner's Wi-Fi drops briefly, NetworkManager can take the failed reconn
 for a new one and, with nobody to answer, stop trying. Applying the Wi-Fi settings again through the Supervisor
 (what Save does under Settings → System → Network) brings the connection back. That needs the Wi-Fi password:
 the Supervisor never hands it out.
+
+The link can also get stuck the other way: the interface stays connected, with an address and a signal, but
+the burner stops answering, and only reconnecting the Wi-Fi brings it back. So the watchdog also reconnects
+when the burner has not answered for a few minutes on a connected interface.
 """
 
 from __future__ import annotations
@@ -48,6 +52,10 @@ _WATCHDOGS: HassKey[dict[str, "WifiWatchdog"]] = HassKey(f"{DOMAIN}_wifi_watchdo
 
 # Supervisor waits up to 60 s for the connection to come up before it answers.
 _UPDATE_TIMEOUT_SECONDS = 90
+
+# The burner skips an answer now and then and is back within a minute or so. Not answering for this long on a
+# connected interface means the link is stuck: reconnect it.
+_UNANSWERED_SECONDS = 3 * 60
 
 
 @dataclass(frozen=True, slots=True)
@@ -133,6 +141,13 @@ def async_stop_wifi_watchdog(hass: HomeAssistant, entry_id: str) -> None:
         watchdog.async_stop()
 
 
+@callback
+def async_burner_reachable(hass: HomeAssistant, entry_id: str, reachable: bool) -> None:
+    """Tell the entry's watchdog, if any, whether the burner just answered."""
+    if watchdog := hass.data.get(_WATCHDOGS, {}).get(entry_id):
+        watchdog.burner_reachable(reachable)
+
+
 class WifiWatchdog:
     """Reconnects the Wi-Fi interface to the burner's network when Home Assistant OS has given up on it.
 
@@ -147,6 +162,10 @@ class WifiWatchdog:
         self.password = password
         self._checking = False
         self._down_since: float | None = None
+        # Since when the burner has failed to answer, as reported by the integration; None while it answers.
+        # Nothing is reported while the integration does not poll, so the watchdog then leaves a connected
+        # interface alone.
+        self._unreachable_since: float | None = None
         self._next_reconnect = -math.inf
         self._reconnects = 0
         self._cancel: CALLBACK_TYPE | None = async_track_time_interval(
@@ -162,6 +181,13 @@ class WifiWatchdog:
         if self._cancel:
             self._cancel()
             self._cancel = None
+
+    @callback
+    def burner_reachable(self, reachable: bool) -> None:
+        if reachable:
+            self._unreachable_since = None
+        elif self._unreachable_since is None:
+            self._unreachable_since = time.monotonic()
 
     @callback
     def _async_tick(self, _now: object) -> None:
@@ -187,28 +213,38 @@ class WifiWatchdog:
         interface, ssid = self.link.interface, self.link.ssid
         network = get_supervisor_client(self._hass).network
         info = await network.interface_info(interface)
-        if info.connected:
-            # Connected or still connecting by itself. An address means it works: reconnect quickly next time.
-            self._down_since = None
-            if info.ipv4 and info.ipv4.address:
-                self._next_reconnect, self._reconnects = -math.inf, 0
-            return
         now = time.monotonic()
-        if self._down_since is None:
-            # Down since the last check at most; give NetworkManager until the next one to reconnect by itself.
-            self._down_since = now
-            return
+        if info.connected:
+            # Connected or still connecting by itself.
+            self._down_since = None
+            if not (info.ipv4 and info.ipv4.address):
+                return
+            if self._unreachable_since is None or now - self._unreachable_since < _UNANSWERED_SECONDS:
+                # An address, and the burner answers or only just stopped: it works, reconnect quickly next time.
+                self._next_reconnect, self._reconnects = -math.inf, 0
+                return
+            # Connected with an address, but no answer for minutes: the link is stuck. Not resetting the
+            # retries here keeps a burner that stays silent after reconnecting from getting a reconnect
+            # every 2 minutes.
+            problem = (
+                "Home Assistant's Wi-Fi connection to the burner (%s on %s) is up, but the burner has not "
+                "answered for %d minutes; reconnecting"
+            )
+            details: tuple[object, ...] = (int((now - self._unreachable_since) // 60),)
+        else:
+            if self._down_since is None:
+                # Down since the last check at most; give NetworkManager until the next one to reconnect by itself.
+                self._down_since = now
+                return
+            problem = "Home Assistant lost its Wi-Fi connection to the burner (%s on %s); reconnecting"
+            details = ()
         if now < self._next_reconnect:
             return
         if not any(ap.ssid == ssid for ap in await network.access_points(interface)):
             # Nothing to connect to: the burner is probably switched off at the mains.
             _LOGGER.debug("Wi-Fi network %s of the burner is not on the air", ssid)
             return
-        _LOGGER.warning(
-            "Home Assistant lost its Wi-Fi connection to the burner (%s on %s); reconnecting",
-            ssid,
-            interface,
-        )
+        _LOGGER.warning(problem, ssid, interface, *details)
         self._reconnects += 1
         # Checks run every WIFI_CHECK_INTERVAL_SECONDS; the slack keeps a check that runs a little early in time.
         self._next_reconnect = now - WIFI_CHECK_INTERVAL_SECONDS / 2 + (

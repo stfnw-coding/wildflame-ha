@@ -129,6 +129,12 @@ Home Assistant OS, once a minute; it is unknown while the Wi-Fi is not connected
   while and lets it in a little later, so a reconnect that fails is tried again every 2 minutes; after 10
   tries (a wrong password, say) only every 30 minutes. Each try adds a "Supervisor wlan0" connection profile
   in Home Assistant OS; they do no harm.
+- **Unavailable while WLAN0 is connected, with an address and a signal**: the link can get stuck this way too,
+  for example after heavy network traffic on the Home Assistant host; reconnecting the Wi-Fi brings the burner
+  back. With the Wi-Fi password filled in, the integration does this for you as well: when the burner has not
+  answered for 3 minutes on a connected interface, it applies the Wi-Fi settings again, with the same retries
+  as above. The log then shows "the burner has not answered for 3 minutes; reconnecting". Short gaps of a
+  minute or so, which the burner recovers from by itself, are left alone.
 - **"Unknown phase"**: the burner reports a phase code the integration does not know yet, possibly an error.
   Switching on is blocked. Please open an issue with the code and what the burner shows.
 - **The Wi-Fi keeps dropping**: look at the history of the Wi-Fi signal sensor. A low signal before each drop
