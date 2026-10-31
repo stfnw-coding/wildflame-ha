@@ -23,7 +23,7 @@ Observed on a Smart Fire A6 (80 cm) with the iOS app "Wild Flame" 1.1.0, October
 | Field | Meaning |
 |---|---|
 | `usart1` | Fuel level in tenths (`2` = 20%) |
-| `usart2` | Phase code, matches the status LED: `6` ready (LED off), `10` warming up (green blinking), `0` burning, `1` cooling down (red blinking), `7` out of fuel (LED not recorded yet) |
+| `usart2` | Phase code, matches the status LED: `6` ready (LED off), `10` warming up (green blinking), `0` burning, `1` cooling down (red blinking), `7` out of fuel, `8` refilling (LED of `7` and `8` not recorded yet) |
 | `usart3` | Flame level `1`–`10`; `0` while not burning or still warming up |
 | `usart4` | Humidity, % (see note) |
 | `usart5` | Room temperature, °C (see note) |
@@ -64,5 +64,16 @@ Note on `usart4` and `usart5`: on the tested Smart Fire A6 they always read `45`
 and cooling down, and the official app shows the same fixed values. On this unit they are not real
 measurements. Other units or models may report real values; reports are welcome.
 
-Unknown so far: the LED in phase `7`, whether it returns to `6` by itself after refilling, and phase codes for errors or
+Refilling the empty tank (2026-10-31): the burner reports phase `8` while it is being refilled and returns to `6`
+by itself once it is full. `usart7` (power) and `usart6` (child lock) stay `0`. The fuel level counts up live
+during the refill.
+
+| Time | Event | Status |
+|---|---|---|
+| 0:00 | Refilling starts | `usart1=0`, `usart2=8` (was `7`) |
+| +2:00 | Fuel level reaches 10% | `usart1=1` |
+| +2:00 to +4:00 | Level rises one step every 10 to 20 seconds | `usart1=2` … `usart1=10` |
+| +5:10 | Ready, about a minute after reaching 100% | `usart1=10`, `usart2=6` |
+
+Unknown so far: the LED in phases `7` and `8`, and phase codes for errors or
 a blocked burner (e.g. room or fuel below 17 °C).

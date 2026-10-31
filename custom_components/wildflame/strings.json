@@ -55,6 +55,7 @@
           "burning": "Burning",
           "cooling": "Cooling down",
           "fuel_empty": "Fuel empty",
+          "refilling": "Refilling",
           "unknown_phase": "Unknown phase"
         }
       },
@@ -90,6 +91,9 @@
     },
     "fuel_empty": {
       "message": "The burner is out of fuel. Refill it before switching it on."
+    },
+    "refilling": {
+      "message": "The burner is being refilled. Wait until refilling is done and the status is Off again."
     },
     "unknown_phase": {
       "message": "The burner reports an unknown phase (code {phase}). Switching on is blocked for safety; check the burner."

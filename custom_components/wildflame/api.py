@@ -51,6 +51,7 @@ class BurnerState(StrEnum):
     BURNING = "burning"
     COOLING = "cooling"  # switched off, cooling down (can take over an hour)
     FUEL_EMPTY = "fuel_empty"  # out of fuel; cannot be switched on until refilled
+    REFILLING = "refilling"  # tank being refilled; back to off once full
     # Phase code not seen before, possibly an error or a blocked burner. Not "unknown": HA reserves that.
     UNKNOWN_PHASE = "unknown_phase"
 
@@ -61,9 +62,18 @@ PHASE_COOLING = 1  # red LED blinking
 PHASE_READY = 6  # LED off
 # Seen 2026-10-20 after the tank ran empty while burning: cooling down first, then 7 instead of 6.
 PHASE_FUEL_EMPTY = 7
+# Seen 2026-10-31 while refilling an empty tank: 7 -> 8 -> 6. The fuel level rose from 0 to 100% during it.
+PHASE_REFILLING = 8
 PHASE_WARMING_UP = 10  # green LED blinking
 KNOWN_PHASES = frozenset(
-    {PHASE_BURNING, PHASE_COOLING, PHASE_READY, PHASE_FUEL_EMPTY, PHASE_WARMING_UP}
+    {
+        PHASE_BURNING,
+        PHASE_COOLING,
+        PHASE_READY,
+        PHASE_FUEL_EMPTY,
+        PHASE_REFILLING,
+        PHASE_WARMING_UP,
+    }
 )
 
 
@@ -91,6 +101,8 @@ class WildflameStatus:
             return BurnerState.UNKNOWN_PHASE
         if self.phase == PHASE_FUEL_EMPTY:
             return BurnerState.FUEL_EMPTY
+        if self.phase == PHASE_REFILLING:
+            return BurnerState.REFILLING
         if self.powered:
             if self.phase == PHASE_WARMING_UP or self.flame_level < FLAME_MIN:
                 return BurnerState.WARMING_UP
