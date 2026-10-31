@@ -18,6 +18,7 @@
           "burning": "mdi:fireplace",
           "cooling": "mdi:snowflake-thermometer",
           "fuel_empty": "mdi:gauge-empty",
+          "refilling": "mdi:gas-station",
           "unknown_phase": "mdi:alert-circle-outline",
           "warming_up": "mdi:fire-circle"
         }

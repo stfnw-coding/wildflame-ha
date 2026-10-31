@@ -55,6 +55,7 @@
           "burning": "Brandt",
           "cooling": "Afkoelen",
           "fuel_empty": "Brandstof leeg",
+          "refilling": "Bijvullen",
           "unknown_phase": "Onbekende fase"
         }
       },
@@ -90,6 +91,9 @@
     },
     "fuel_empty": {
       "message": "De brandstof van de haard is op. Vul hem bij voordat je hem aanzet."
+    },
+    "refilling": {
+      "message": "De haard wordt bijgevuld. Wacht tot het bijvullen klaar is en de status weer Uit is."
     },
     "unknown_phase": {
       "message": "De haard meldt een onbekende fase (code {phase}). Aanzetten is voor de veiligheid geblokkeerd; controleer de haard."

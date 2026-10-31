@@ -157,6 +157,36 @@ async def test_refuse_start_when_fuel_empty(hass: HomeAssistant, entry, burner, 
     assert burner.commands == []
 
 
+async def test_refill_sequence(hass: HomeAssistant, entry, burner, caplog) -> None:
+    """Refilling an empty tank, as seen on 2026-10-31: phase 7 -> 8 while the level rises -> 6."""
+    burner.fuel, burner.phase = 0, 7
+    await setup(hass, entry)
+    coordinator = entry.runtime_data
+    assert hass.states.get(STATUS).state == "fuel_empty"
+    burner.phase = 8
+    await coordinator.async_refresh()
+    assert hass.states.get(STATUS).state == "refilling"
+    burner.fuel = 6
+    await coordinator.async_refresh()
+    assert hass.states.get(STATUS).state == "refilling"
+    assert hass.states.get("sensor.haard_brandstofniveau").state == "60"
+    burner.fuel, burner.phase = 10, 6
+    await coordinator.async_refresh()
+    assert hass.states.get(STATUS).state == "off"
+    assert hass.states.get("sensor.haard_brandstofniveau").state == "100"
+    assert "phase code" not in caplog.text
+
+
+async def test_refuse_start_while_refilling(hass: HomeAssistant, entry, burner) -> None:
+    burner.fuel, burner.phase = 4, 8
+    await setup(hass, entry)
+    with pytest.raises(ServiceValidationError) as err:
+        await call(hass, "switch", "turn_on", SWITCH)
+    assert err.value.translation_key == "refilling"
+    assert "being refilled" in str(err.value)
+    assert burner.commands == []
+
+
 async def test_start_allowed_when_ready(hass: HomeAssistant, entry, burner) -> None:
     burner.phase = 6  # LED off
     await setup(hass, entry)

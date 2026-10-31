@@ -14,7 +14,7 @@ Home Assistant. Geen cloud: Home Assistant praat rechtstreeks met de haard via d
 |---|---|
 | `switch.<naam>` | Haard aan/uit |
 | `number.<naam>_vlamhoogte` | Vlamhoogte 1–10 (niet beschikbaar als de haard niet brandt) |
-| `sensor.<naam>_status` | Uit / Opwarmen / Brandt / Afkoelen / Brandstof leeg / Onbekende fase |
+| `sensor.<naam>_status` | Uit / Opwarmen / Brandt / Afkoelen / Brandstof leeg / Bijvullen / Onbekende fase |
 | `sensor.<naam>_brandstofniveau` | Brandstof in % (stappen van 10%) |
 | `sensor.<naam>_kamertemperatuur` | Kamertemperatuur in °C |
 | `sensor.<naam>_luchtvochtigheid` | Luchtvochtigheid in % |
@@ -25,7 +25,8 @@ Home Assistant. Geen cloud: Home Assistant praat rechtstreeks met de haard via d
 ### Veiligheid
 De haard kent alleen *toggle*- en *stap*-commando's: hetzelfde commando zet hem aan én uit. De integratie leest
 daarom altijd eerst de status en stuurt alleen een commando als dat nodig is:
-- aanzetten wordt geweigerd tijdens het afkoelen, als de brandstof op is of als het kinderslot aan staat;
+- aanzetten wordt geweigerd tijdens het afkoelen en het bijvullen, als de brandstof op is of als het
+  kinderslot aan staat;
 - aanzetten wordt ook geweigerd als de haard een onbekende fasecode meldt (mogelijk een storing); de code komt
   in het logboek zodat hij kan worden toegevoegd;
 - na een aan/uit- of kinderslot-commando wordt 30 seconden geen tweede gestuurd tot de haard de nieuwe toestand
@@ -83,10 +84,13 @@ Is het adres veranderd, of wil je het wifi-wachtwoord toevoegen of weghalen? Kie
 | Brandt | – | Brandt | Begint op stand 5, regelbaar 1–10 |
 | Afkoelen | rood knipperend | Afkoelen | Kan meer dan een uur duren. Niet aan te zetten of bij te vullen |
 | Brandstof op | nog niet vastgelegd | Brandstof leeg | Als de tank leeg raakt: de haard gaat vanzelf uit, koelt af en meldt dan dit. Vul bij voordat je hem aanzet |
+| Bijvullen | nog niet vastgelegd | Bijvullen | Terwijl de tank wordt bijgevuld; het brandstofniveau loopt mee op. Ongeveer een minuut nadat de tank vol is vanzelf weer Uit. Niet aan te zetten |
 
 ## Voorbeelden
 - Een melding als de haard weer gebruikt of bijgevuld kan worden: trigger op `sensor.<naam>_status` die van
   *Afkoelen* naar *Uit* of *Brandstof leeg* gaat.
+- Een melding als het bijvullen klaar is: trigger op `sensor.<naam>_status` die van *Bijvullen* naar *Uit*
+  gaat; `sensor.<naam>_brandstofniveau` laat dan zien hoe vol de tank is.
 - Een herinnering om bij te vullen: numerieke-statustrigger op `sensor.<naam>_brandstofniveau` onder 20 (dus 10% of minder).
 - Zorgen dat de haard nooit de hele nacht brandt: een automatisering die `switch.<naam>` uitzet als hij
   bijvoorbeeld 4 uur aan staat (statustrigger met *voor*). Let op: als Home Assistant herstart, begint die
