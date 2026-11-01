@@ -129,10 +129,11 @@ Home Assistant OS, once a minute; it is unknown while the Wi-Fi is not connected
   every minute, also while the integration itself cannot start because the burner is unreachable. When the
   interface has been down for a minute and the burner's network is on the air, it applies the Wi-Fi settings
   again (WPA-PSK, IPv4 automatic) and sets the integration up again right away. The log then shows
-  "Home Assistant lost its Wi-Fi connection to the burner". The burner often turns Home Assistant away for a
-  while and lets it in a little later, so a reconnect that fails is tried again every 2 minutes; after 10
-  tries (a wrong password, say) only every 30 minutes. Each try adds a "Supervisor wlan0" connection profile
-  in Home Assistant OS; they do no harm.
+  "Home Assistant lost its Wi-Fi connection to the burner". It leaves Home Assistant OS alone while that is
+  connecting by itself, and gives it a minute when the burner's network has just come back on the air. The
+  burner often turns Home Assistant away for a while and lets it in a little later, so a reconnect that fails
+  is tried again every 2 minutes; after 10 tries (a wrong password, say) only every 30 minutes. Each try adds
+  a "Supervisor wlan0" connection profile in Home Assistant OS; they do no harm.
 - **Unavailable while WLAN0 is connected, with an address and a signal**: the link can get stuck this way too,
   for example after heavy network traffic on the Home Assistant host; reconnecting the Wi-Fi brings the burner
   back. With the Wi-Fi password filled in, the integration does this for you as well: when the burner has not

@@ -128,10 +128,12 @@ Assistant OS, één keer per minuut; zolang de wifi niet verbonden is, is het on
   de wifi-interface, ook als de integratie zelf niet kan starten omdat de haard onbereikbaar is. Is de
   interface een minuut niet verbonden en is het wifi van de haard wel in de lucht, dan past hij de
   wifi-instellingen opnieuw toe (WPA-PSK, IPv4 automatisch) en start de integratie meteen opnieuw. In het
-  logboek staat dan "Home Assistant lost its Wi-Fi connection to the burner". De haard weigert Home Assistant
-  vaak een tijdje en laat hem even later wel toe, dus een mislukte poging wordt elke 2 minuten herhaald; na
-  10 pogingen (bij een fout wachtwoord bijvoorbeeld) nog maar elke 30 minuten. Elke poging voegt in Home
-  Assistant OS een verbindingsprofiel "Supervisor wlan0" toe; dat kan geen kwaad.
+  logboek staat dan "Home Assistant lost its Wi-Fi connection to the burner". Maakt Home Assistant OS zelf al
+  verbinding, dan laat hij dat met rust, en is het wifi van de haard net weer in de lucht, dan krijgt Home
+  Assistant OS eerst een minuut om zelf te verbinden. De haard weigert Home Assistant vaak een tijdje en laat
+  hem even later wel toe, dus een mislukte poging wordt elke 2 minuten herhaald; na 10 pogingen (bij een fout
+  wachtwoord bijvoorbeeld) nog maar elke 30 minuten. Elke poging voegt in Home Assistant OS een
+  verbindingsprofiel "Supervisor wlan0" toe; dat kan geen kwaad.
 - **Niet beschikbaar terwijl WLAN0 wel verbonden is, met adres en signaal**: ook zo kan de verbinding
   vastlopen, bijvoorbeeld na veel netwerkverkeer op de Home Assistant-machine; de wifi opnieuw verbinden brengt
   de haard terug. Heb je het wifi-wachtwoord ingevuld, dan doet de integratie ook dit zelf: geeft de haard 3

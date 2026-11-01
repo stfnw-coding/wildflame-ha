@@ -166,6 +166,8 @@ class WifiWatchdog:
         # Nothing is reported while the integration does not poll, so the watchdog then leaves a connected
         # interface alone.
         self._unreachable_since: float | None = None
+        # Whether the burner's network was on the air at the last scan.
+        self._on_air = True
         self._next_reconnect = -math.inf
         self._reconnects = 0
         self._cancel: CALLBACK_TYPE | None = async_track_time_interval(
@@ -217,6 +219,7 @@ class WifiWatchdog:
         if info.connected:
             # Connected or still connecting by itself.
             self._down_since = None
+            self._on_air = True
             if not (info.ipv4 and info.ipv4.address):
                 return
             if self._unreachable_since is None or now - self._unreachable_since < _UNANSWERED_SECONDS:
@@ -240,9 +243,21 @@ class WifiWatchdog:
             details = ()
         if now < self._next_reconnect:
             return
-        if not any(ap.ssid == ssid for ap in await network.access_points(interface)):
-            # Nothing to connect to: the burner is probably switched off at the mains.
+        on_air = any(ap.ssid == ssid for ap in await network.access_points(interface))
+        was_on_air, self._on_air = self._on_air, on_air
+        if not on_air:
+            # Nothing to connect to: the burner is switched off at the mains, or its Wi-Fi is down.
             _LOGGER.debug("Wi-Fi network %s of the burner is not on the air", ssid)
+            return
+        if not was_on_air:
+            # Back on the air. NetworkManager connects by itself once it sees the network: give it until the next
+            # check.
+            _LOGGER.debug("Wi-Fi network %s of the burner is back on the air", ssid)
+            return
+        if not info.connected and (await network.interface_info(interface)).connected:
+            # NetworkManager started connecting by itself during the scan, which takes a few seconds and can
+            # prompt it to: a reconnect now would cut that short.
+            _LOGGER.debug("NetworkManager is connecting to %s by itself", ssid)
             return
         _LOGGER.warning(problem, ssid, interface, *details)
         self._reconnects += 1

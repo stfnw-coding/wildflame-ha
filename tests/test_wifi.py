@@ -166,6 +166,48 @@ async def test_waits_for_burner_wifi_on_the_air(hass: HomeAssistant, supervisor,
     await tick(3)
     supervisor.send_command.assert_not_awaited()
     supervisor.client.network.access_points.return_value = [SimpleNamespace(ssid=SSID)]
+    # Back on the air: NetworkManager connects by itself once it sees the network, so it gets a minute first.
+    await tick()
+    supervisor.send_command.assert_not_awaited()
+    await tick()
+    supervisor.send_command.assert_awaited_once()
+
+
+async def test_networkmanager_reconnects_when_back_on_the_air(hass: HomeAssistant, supervisor, tick) -> None:
+    """Seen 2026-11-01: the burner's network was off the air for 5 minutes, then NetworkManager got in by itself."""
+    watched_entry(hass)
+    lose_wifi(supervisor)
+    supervisor.client.network.access_points.return_value = [SimpleNamespace(ssid="Neighbours")]
+    await tick(3)
+    supervisor.client.network.access_points.return_value = [SimpleNamespace(ssid=SSID)]
+    await tick()
+    supervisor.client.network.interface_info.return_value = WLAN
+    await tick()
+    supervisor.send_command.assert_not_awaited()
+    # A next loss is handled as usual: a minute for NetworkManager, then a reconnect.
+    lose_wifi(supervisor)
+    await tick(2)
+    supervisor.send_command.assert_awaited_once()
+
+
+async def test_networkmanager_connects_during_the_scan(hass: HomeAssistant, supervisor, tick) -> None:
+    """Seen 2026-11-01: the scan takes a few seconds, and NetworkManager connected by itself meanwhile."""
+    watched_entry(hass)
+    lose_wifi(supervisor)
+    await tick()
+
+    async def networkmanager_connects(_interface: str) -> list[SimpleNamespace]:
+        supervisor.client.network.interface_info.return_value = interface(
+            "wlan0", InterfaceType.WIRELESS, None, connected=True
+        )
+        return [SimpleNamespace(ssid=SSID)]
+
+    supervisor.client.network.access_points.side_effect = networkmanager_connects
+    await tick()
+    supervisor.send_command.assert_not_awaited()
+    # NetworkManager's own try failed: reconnect at the next check.
+    supervisor.client.network.access_points.side_effect = None
+    lose_wifi(supervisor)
     await tick()
     supervisor.send_command.assert_awaited_once()
 
@@ -225,9 +267,9 @@ async def test_reconnect_failure_is_logged(
     supervisor.send_command.side_effect = error
     await tick(2)
     assert "Could not restore the Wi-Fi connection to the burner" in caplog.text
-    # The next check still runs.
+    # The next check still runs (the reconnecting check read the interface twice: before and after the scan).
     await tick()
-    assert supervisor.client.network.interface_info.await_count == 3
+    assert supervisor.client.network.interface_info.await_count == 4
 
 
 async def test_reconnects_while_setup_retries(hass: HomeAssistant, supervisor, burner, tick) -> None:
