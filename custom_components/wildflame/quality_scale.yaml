@@ -87,8 +87,10 @@ rules:
   icon-translations: done
   reconfiguration-flow: done
   repair-issues:
-    status: exempt
-    comment: There are no problems the user can fix from Home Assistant; a lost connection shows as unavailable.
+    status: done
+    comment: >-
+      A burner whose Wi-Fi stays on the air but turns every reconnect away raises an issue that says to switch
+      the burner off and on.
   stale-devices:
     status: exempt
     comment: One config entry is one burner; removing the entry removes the device.

@@ -107,5 +107,11 @@
     "command_failed": {
       "message": "Command to the burner failed: {error}"
     }
+  },
+  "issues": {
+    "wifi_refused": {
+      "title": "The burner's Wi-Fi turns Home Assistant away",
+      "description": "Home Assistant has tried {tries} times to reconnect to the burner's Wi-Fi network {ssid}. The network is on the air, but the burner does not let Home Assistant in. Switch the burner off at the mains (or unplug it) for 10 seconds and on again. Home Assistant notices and reconnects by itself within a few minutes; this issue then goes away by itself."
+    }
   }
 }

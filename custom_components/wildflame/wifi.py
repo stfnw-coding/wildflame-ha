@@ -8,6 +8,10 @@ the Supervisor never hands it out.
 The link can also get stuck the other way: the interface stays connected, with an address and a signal, but
 the burner stops answering, and only reconnecting the Wi-Fi brings it back. So the watchdog also reconnects
 when the burner has not answered for a few minutes on a connected interface.
+
+And the burner's own Wi-Fi can get stuck: its network stays on the air, but it turns every connection away until
+it is switched off and on at the mains. The watchdog then raises a repair issue saying so, and reconnects right
+away once the network has been off the air and is back.
 """
 
 from __future__ import annotations
@@ -29,6 +33,7 @@ from homeassistant.components.hassio.handler import HassioAPIError
 from homeassistant.config_entries import ConfigEntry, ConfigEntryState
 from homeassistant.const import CONF_PASSWORD
 from homeassistant.core import CALLBACK_TYPE, HomeAssistant, callback
+from homeassistant.helpers import issue_registry as ir
 from homeassistant.helpers.event import async_track_time_interval
 from homeassistant.helpers.hassio import is_hassio
 from homeassistant.helpers.update_coordinator import DataUpdateCoordinator, UpdateFailed
@@ -41,7 +46,8 @@ _LOGGER = logging.getLogger(__name__)
 # The burner's access point turns Home Assistant away at times (association rejected, status 16) and lets it in
 # a few seconds later, and NetworkManager gives up after a few tries in about 25 seconds. So a reconnect often
 # fails and the next one, soon after, gets in: try every 2 minutes. Each try adds a connection profile in
-# NetworkManager, so after 10 tries (a wrong password, say) only try every 30 minutes.
+# NetworkManager, so after 10 tries (a wrong password, or a burner whose Wi-Fi is stuck) only try every 30
+# minutes.
 _RETRY_SECONDS = 2 * 60
 _FAST_RETRIES = 10
 _SLOW_RETRY_SECONDS = 30 * 60
@@ -56,6 +62,10 @@ _UPDATE_TIMEOUT_SECONDS = 90
 # The burner skips an answer now and then and is back within a minute or so. Not answering for this long on a
 # connected interface means the link is stuck: reconnect it.
 _UNANSWERED_SECONDS = 3 * 60
+
+
+def _issue_id(entry_id: str) -> str:
+    return f"wifi_refused_{entry_id}"
 
 
 @dataclass(frozen=True, slots=True)
@@ -170,6 +180,7 @@ class WifiWatchdog:
         self._on_air = True
         self._next_reconnect = -math.inf
         self._reconnects = 0
+        self._issue_raised = False
         self._cancel: CALLBACK_TYPE | None = async_track_time_interval(
             hass,
             self._async_tick,
@@ -183,6 +194,36 @@ class WifiWatchdog:
         if self._cancel:
             self._cancel()
             self._cancel = None
+        self._clear_issue()
+
+    @callback
+    def _raise_issue(self) -> None:
+        if self._issue_raised:
+            return
+        self._issue_raised = True
+        _LOGGER.warning(
+            "The burner's Wi-Fi network %s is on the air, but Home Assistant has not got through after %d tries. "
+            "Switch the burner off at the mains for 10 seconds and on again; Home Assistant then reconnects by "
+            "itself. Until then it tries every %d minutes",
+            self.link.ssid,
+            self._reconnects,
+            _SLOW_RETRY_SECONDS // 60,
+        )
+        ir.async_create_issue(
+            self._hass,
+            DOMAIN,
+            _issue_id(self._entry_id),
+            is_fixable=False,
+            severity=ir.IssueSeverity.WARNING,
+            translation_key="wifi_refused",
+            translation_placeholders={"ssid": self.link.ssid, "tries": str(self._reconnects)},
+        )
+
+    @callback
+    def _clear_issue(self) -> None:
+        if self._issue_raised:
+            self._issue_raised = False
+            ir.async_delete_issue(self._hass, DOMAIN, _issue_id(self._entry_id))
 
     @callback
     def burner_reachable(self, reachable: bool) -> None:
@@ -225,6 +266,7 @@ class WifiWatchdog:
             if self._unreachable_since is None or now - self._unreachable_since < _UNANSWERED_SECONDS:
                 # An address, and the burner answers or only just stopped: it works, reconnect quickly next time.
                 self._next_reconnect, self._reconnects = -math.inf, 0
+                self._clear_issue()
                 return
             # Connected with an address, but no answer for minutes: the link is stuck. Not resetting the
             # retries here keeps a burner that stays silent after reconnecting from getting a reconnect
@@ -241,8 +283,8 @@ class WifiWatchdog:
                 return
             problem = "Home Assistant lost its Wi-Fi connection to the burner (%s on %s); reconnecting"
             details = ()
-        if now < self._next_reconnect:
-            return
+        # Scanned at every check, also while waiting for the next reconnect: a burner switched off and on (the cure
+        # for a stuck burner Wi-Fi) must not wait up to 30 minutes for that.
         on_air = any(ap.ssid == ssid for ap in await network.access_points(interface))
         was_on_air, self._on_air = self._on_air, on_air
         if not on_air:
@@ -250,9 +292,16 @@ class WifiWatchdog:
             _LOGGER.debug("Wi-Fi network %s of the burner is not on the air", ssid)
             return
         if not was_on_air:
-            # Back on the air. NetworkManager connects by itself once it sees the network: give it until the next
-            # check.
+            # Back on the air: the burner was switched off and on, say, and what turned Home Assistant away may be
+            # gone, so reconnect quickly again. NetworkManager connects by itself once it sees the network: give it
+            # until the next check.
             _LOGGER.debug("Wi-Fi network %s of the burner is back on the air", ssid)
+            self._next_reconnect, self._reconnects = -math.inf, 0
+            return
+        if self._reconnects >= _FAST_RETRIES:
+            # On the air, but 10 reconnects did not get through: the burner's Wi-Fi is stuck.
+            self._raise_issue()
+        if now < self._next_reconnect:
             return
         if not info.connected and (await network.interface_info(interface)).connected:
             # NetworkManager started connecting by itself during the scan, which takes a few seconds and can
