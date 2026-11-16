@@ -134,6 +134,10 @@ Home Assistant OS, once a minute; it is unknown while the Wi-Fi is not connected
   burner often turns Home Assistant away for a while and lets it in a little later, so a reconnect that fails
   is tried again every 2 minutes; after 10 tries (a wrong password, say) only every 30 minutes. Each try adds
   a "Supervisor wlan0" connection profile in Home Assistant OS; they do no harm.
+- **"The burner's Wi-Fi turns Home Assistant away" under Settings → Repairs**: the burner's network is on the
+  air, but 10 reconnects in a row did not get through. The burner's Wi-Fi is stuck: switch the burner off at
+  the mains (or unplug it) for 10 seconds and on again. The integration keeps scanning while it waits, sees the
+  network go off the air and come back, and reconnects within a few minutes; the repair then goes away by itself.
 - **Unavailable while WLAN0 is connected, with an address and a signal**: the link can get stuck this way too,
   for example after heavy network traffic on the Home Assistant host; reconnecting the Wi-Fi brings the burner
   back. With the Wi-Fi password filled in, the integration does this for you as well: when the burner has not

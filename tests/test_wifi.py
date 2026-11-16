@@ -16,6 +16,7 @@ from homeassistant.const import CONF_HOST, CONF_PASSWORD, EntityCategory
 from homeassistant.core import HomeAssistant
 from homeassistant.data_entry_flow import FlowResultType
 from homeassistant.helpers import entity_registry as er
+from homeassistant.helpers import issue_registry as ir
 from pytest_homeassistant_custom_component.common import MockConfigEntry, async_fire_time_changed
 from pytest_homeassistant_custom_component.components.diagnostics import (
     get_diagnostics_for_config_entry,
@@ -237,6 +238,74 @@ async def test_retries_every_2_minutes_then_every_30(hass: HomeAssistant, superv
     lose_wifi(supervisor)
     await tick(2)
     assert supervisor.send_command.await_count == 13
+
+
+def refused_issue(hass: HomeAssistant, entry: MockConfigEntry) -> ir.IssueEntry | None:
+    return ir.async_get(hass).async_get_issue(DOMAIN, f"wifi_refused_{entry.entry_id}")
+
+
+async def use_up_fast_retries(supervisor, tick) -> None:
+    await tick(2)
+    for _ in range(9):
+        await tick(2)
+    assert supervisor.send_command.await_count == 10
+
+
+async def test_stuck_burner_wifi_raises_issue(
+    hass: HomeAssistant, supervisor, tick, caplog: pytest.LogCaptureFixture
+) -> None:
+    """Seen 2026-11-16: the burner's network stayed on the air, but every reconnect failed for half an hour."""
+    entry = watched_entry(hass)
+    lose_wifi(supervisor)
+    await use_up_fast_retries(supervisor, tick)
+    assert refused_issue(hass, entry) is None
+    # The 10th try did not get through either.
+    await tick()
+    issue = refused_issue(hass, entry)
+    assert issue is not None
+    assert issue.translation_key == "wifi_refused"
+    assert issue.translation_placeholders == {"ssid": SSID, "tries": "10"}
+    assert "Switch the burner off at the mains" in caplog.text
+    # Gone once the Wi-Fi works again.
+    supervisor.client.network.interface_info.return_value = WLAN
+    await tick()
+    assert refused_issue(hass, entry) is None
+
+
+async def test_reconnects_right_after_power_cycle(hass: HomeAssistant, supervisor, tick) -> None:
+    """Switched off and on during the 30-minute wait: reconnect within minutes, not at the end of the wait."""
+    entry = watched_entry(hass)
+    lose_wifi(supervisor)
+    await use_up_fast_retries(supervisor, tick)
+    await tick(3)
+    assert supervisor.send_command.await_count == 10
+    supervisor.client.network.access_points.return_value = []
+    await tick()
+    supervisor.client.network.access_points.return_value = [SimpleNamespace(ssid=SSID)]
+    # Back on the air: a minute for NetworkManager, then a reconnect.
+    await tick()
+    assert supervisor.send_command.await_count == 10
+    await tick()
+    assert supervisor.send_command.await_count == 11
+    # And quick retries again.
+    await tick(2)
+    assert supervisor.send_command.await_count == 12
+    # The issue stays until the Wi-Fi actually works.
+    assert refused_issue(hass, entry) is not None
+    supervisor.client.network.interface_info.return_value = WLAN
+    await tick()
+    assert refused_issue(hass, entry) is None
+
+
+async def test_issue_removed_with_entry(hass: HomeAssistant, supervisor, burner, tick) -> None:
+    entry = wifi_entry(burner.host)
+    await setup(hass, entry)
+    lose_wifi(supervisor)
+    await use_up_fast_retries(supervisor, tick)
+    await tick()
+    assert refused_issue(hass, entry) is not None
+    await hass.config_entries.async_remove(entry.entry_id)
+    assert refused_issue(hass, entry) is None
 
 
 async def test_connecting_does_not_reset_the_retries(hass: HomeAssistant, supervisor, tick) -> None:

@@ -107,5 +107,11 @@
     "command_failed": {
       "message": "Commando naar de haard mislukt: {error}"
     }
+  },
+  "issues": {
+    "wifi_refused": {
+      "title": "De wifi van de haard laat Home Assistant niet meer binnen",
+      "description": "Home Assistant heeft {tries} keer geprobeerd opnieuw verbinding te maken met de wifi van de haard ({ssid}). Het netwerk is in de lucht, maar de haard laat Home Assistant niet binnen. Zet de haard 10 seconden helemaal uit (hoofdschakelaar of stekker eruit) en daarna weer aan. Home Assistant merkt dat en maakt binnen een paar minuten zelf weer verbinding; deze melding verdwijnt dan vanzelf."
+    }
   }
 }
