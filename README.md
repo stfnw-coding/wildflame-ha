@@ -58,6 +58,9 @@ The burner's Wi-Fi accepts only a few clients; your phone does not need to stay 
 
 ### HACS (recommended)
 
+On Home Assistant 2026.11 and later, HACS is built in as **Settings → Marketplace**; searching and downloading
+work the same there.
+
 1. Open HACS in Home Assistant.
 2. Search for **Wild Flame** and open it.
 3. Click **Download**, then restart Home Assistant.
@@ -69,6 +72,9 @@ The burner's Wi-Fi accepts only a few clients; your phone does not need to stay 
 1. In HACS, open the menu (⋮) and choose **Custom repositories**.
 2. Add `https://github.com/stfnw-coding/wildflame-ha` with category **Integration**.
 3. Install **Wild Flame** and restart Home Assistant.
+
+In the Marketplace, choose **Add from link** at the top instead and paste the same link; it asks you to connect
+GitHub first.
 
 </details>
 
