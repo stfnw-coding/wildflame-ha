@@ -147,6 +147,11 @@ Assistant OS, één keer per minuut; zolang de wifi niet verbonden is, is het on
   hem even later wel toe, dus een mislukte poging wordt elke 2 minuten herhaald; na 10 pogingen (bij een fout
   wachtwoord bijvoorbeeld) nog maar elke 30 minuten. Elke poging voegt in Home Assistant OS een
   verbindingsprofiel "Supervisor wlan0" toe; dat kan geen kwaad.
+- **"De wifi van de haard laat Home Assistant niet meer binnen" onder Instellingen → Reparaties**: het wifi van
+  de haard is in de lucht, maar 10 pogingen op rij om verbinding te maken lukten niet. Het wifi van de haard is
+  vastgelopen: zet de haard 10 seconden helemaal uit (hoofdschakelaar of stekker eruit) en daarna weer aan. De
+  integratie blijft ondertussen zoeken, ziet het netwerk wegvallen en terugkomen en maakt binnen een paar
+  minuten weer verbinding; de melding verdwijnt dan vanzelf.
 - **Niet beschikbaar terwijl WLAN0 wel verbonden is, met adres en signaal**: ook zo kan de verbinding
   vastlopen, bijvoorbeeld na veel netwerkverkeer op de Home Assistant-machine; de wifi opnieuw verbinden brengt
   de haard terug. Heb je het wifi-wachtwoord ingevuld, dan doet de integratie ook dit zelf: geeft de haard 3
