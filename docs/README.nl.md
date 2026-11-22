@@ -56,10 +56,23 @@ een paar apparaten tegelijk; je telefoon hoeft niet met de haard verbonden te bl
 ## Installeren
 
 ### HACS (aanbevolen)
-1. HACS → ⋮ → **Aangepaste repositories** → voeg `https://github.com/stfnw-coding/wildflame-ha` toe, categorie **Integratie**.
-2. Installeer **Wild Flame** en herstart Home Assistant.
+
+1. Open HACS in Home Assistant.
+2. Zoek naar **Wild Flame** en open de integratie.
+3. Klik op **Download** en herstart Home Assistant.
+4. Ga naar **Instellingen → Apparaten & diensten → Integratie toevoegen** en zoek op **Wild Flame**.
+
+<details>
+<summary>Staat hij niet in HACS? Voeg hem toe als custom repository</summary>
+
+1. Open in HACS het menu (⋮) en kies **Custom repositories**.
+2. Voeg `https://github.com/stfnw-coding/wildflame-ha` toe met categorie **Integration**.
+3. Installeer **Wild Flame** en herstart Home Assistant.
+
+</details>
 
 ### Handmatig
+
 Kopieer `custom_components/wildflame` naar `/config/custom_components/wildflame` en herstart Home Assistant.
 
 ## Toevoegen

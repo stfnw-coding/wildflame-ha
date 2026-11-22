@@ -57,10 +57,23 @@ The burner's Wi-Fi accepts only a few clients; your phone does not need to stay 
 ## Installation
 
 ### HACS (recommended)
-1. HACS → ⋮ → **Custom repositories** → add `https://github.com/stfnw-coding/wildflame-ha`, category **Integration**.
-2. Install **Wild Flame** and restart Home Assistant.
+
+1. Open HACS in Home Assistant.
+2. Search for **Wild Flame** and open it.
+3. Click **Download**, then restart Home Assistant.
+4. Go to **Settings → Devices & services → Add integration** and search for **Wild Flame**.
+
+<details>
+<summary>Not showing up in HACS? Add it as a custom repository</summary>
+
+1. In HACS, open the menu (⋮) and choose **Custom repositories**.
+2. Add `https://github.com/stfnw-coding/wildflame-ha` with category **Integration**.
+3. Install **Wild Flame** and restart Home Assistant.
+
+</details>
 
 ### Manual
+
 Copy `custom_components/wildflame` to `/config/custom_components/wildflame` and restart Home Assistant.
 
 ## Setup
